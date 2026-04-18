@@ -10,8 +10,8 @@ function App() {
   }
 
   const [form, setForm] = useState({
-    localIP: '192.168.1.200',
-    remoteIP: '192.168.1.30',
+    localIP: '192.168.1.100',
+    remoteIP: '192.168.1.200',
     psk: 'IPsuperSECRET',
 
     step1: true,
@@ -38,7 +38,7 @@ function App() {
     profilePublic: true
   })
 
-  const [log, setLog] = useState('Dastur yuklandi.\n')
+  const [log, setLog] = useState('Dastur ishga tushdi.\n')
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
@@ -75,7 +75,7 @@ function App() {
   }
 
   async function handleApply() {
-    appendLog('OK BOSILDI', 'Apply boshlandi...')
+    appendLog('OK BOSILDI', 'IPSec sozlash boshlandi...')
     try {
       const res = await api.apply(form)
       appendLog('OK / APPLY RESULT', res?.output || 'Natija yo‘q')
@@ -85,7 +85,7 @@ function App() {
   }
 
   async function handleCheck() {
-    appendLog('CHECK BOSILDI', 'Check boshlandi...')
+    appendLog('CHECK BOSILDI', 'Mavjud IPSec qoidalar tekshirilmoqda...')
     try {
       const res = await api.check()
       appendLog('CHECK RESULT', res?.output || 'Natija yo‘q')
@@ -95,7 +95,7 @@ function App() {
   }
 
   async function handleRemove() {
-    appendLog('REMOVE BOSILDI', 'Remove boshlandi...')
+    appendLog('REMOVE BOSILDI', 'IPSec qoidalari o‘chirilyapti...')
     try {
       const res = await api.remove()
       appendLog('REMOVE RESULT', res?.output || 'Natija yo‘q')
@@ -107,16 +107,16 @@ function App() {
   const steps = [
     { key: 'step1', num: 1, title: 'wf.msc / Connection Security Rules', desc: 'Windows Defender Firewall with Advanced Security konsolini ochish va New Rule boshlash.' },
     { key: 'step2', num: 2, title: 'Custom rule', desc: 'Rule Type oynasida Custom tanlanadi.' },
-    { key: 'step3', num: 3, title: 'Endpoint 1 IP', desc: 'Endpoint 1 uchun local server IP kiritiladi.' },
-    { key: 'step4', num: 4, title: 'Endpoint 2 IP', desc: 'Endpoint 2 uchun remote host yoki subnet kiritiladi.' },
-    { key: 'step5', num: 5, title: 'Require authentication', desc: 'Inbound va outbound uchun autentifikatsiya talab qilinadi.' },
-    { key: 'step6', num: 6, title: 'Advanced + PreShared Key', desc: 'Customize ichidan PSK usuli yoqiladi.' },
+    { key: 'step3', num: 3, title: 'Endpoint 1 IP', desc: 'Endpoint 1 uchun local server yoki noutbuk IP kiritiladi.' },
+    { key: 'step4', num: 4, title: 'Endpoint 2 IP', desc: 'Endpoint 2 uchun client noutbuk IP yoki subnet kiritiladi.' },
+    { key: 'step5', num: 5, title: 'Require authentication', desc: 'Inbound va outbound trafik uchun autentifikatsiya talab qilinadi.' },
+    { key: 'step6', num: 6, title: 'Advanced + PreShared Key', desc: 'Customize ichidan PSK yoqiladi.' },
     { key: 'step7', num: 7, title: 'Protocol Any', desc: 'Connection security rule uchun Any protokol ishlatiladi.' },
     { key: 'step8', num: 8, title: 'Profiles', desc: 'Domain, Private, Public profillari tanlanadi.' },
     { key: 'step9', num: 9, title: 'IKEv2', desc: 'Key exchange moduli sifatida IKEv2 yoqiladi.' },
-    { key: 'step10', num: 10, title: 'AES256 / SHA256', desc: 'Quick Mode uchun kuchli kripto algoritmlar yoqiladi.' },
-    { key: 'step11', num: 11, title: 'Firewall Rule', desc: 'Inbound uchun shifrlangan oqimlarga ruxsat beruvchi qoida yaratiladi.' },
-    { key: 'step12', num: 12, title: 'Rule name / Finish', desc: 'IPSec wizard bosqichlari yakunlanadi va qoida nomi beriladi.' },
+    { key: 'step10', num: 10, title: 'AES256 / SHA256', desc: 'Quick Mode uchun kuchli kripto algoritmlar ishlatiladi.' },
+    { key: 'step11', num: 11, title: 'Firewall Rule', desc: 'Inbound uchun IPSec-trafikka ruxsat beruvchi qoida yaratiladi.' },
+    { key: 'step12', num: 12, title: 'Rule name / Finish', desc: 'Sozlash yakunlanadi va qoida nomi belgilanadi.' },
   ]
 
   return (
@@ -130,7 +130,7 @@ function App() {
             <div className="brand-icon">🛡️</div>
             <div>
               <h1>IPSec Wizard</h1>
-              <p>Windows Server GUI bosqichlarini bitta ilovaga yig‘ish</p>
+              <p>Windows Server va Windows noutbuklar uchun IPSec boshqaruvi</p>
             </div>
           </div>
 
@@ -139,7 +139,7 @@ function App() {
               <span className={`status-dot ${isAdmin ? 'ok' : 'warn'}`}></span>
               <div>
                 <strong>{isAdmin ? 'Administrator rejimi faol' : 'Administrator rejimi faol emas'}</strong>
-                <p>OK bosilganda PowerShell qoida yaratadi</p>
+                <p>OK bosilganda PowerShell orqali qoida yaratiladi</p>
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ function App() {
           <div className="side-card">
             <h3>Tanlangan bosqichlar</h3>
             <div className="big-count">{selectedCount} / 12</div>
-            <p>Endi barcha bosqichlar galochka bilan tanlanadi yoki o‘chiriladi.</p>
+            <p>Barcha bosqichlar galochka bilan yoqiladi yoki o‘chiriladi.</p>
           </div>
 
           <div className="side-card">
@@ -171,8 +171,9 @@ function App() {
           <section className="hero-card">
             <div>
               <h2>Rasmdagi IPSec wizard bosqichlari</h2>
-              <p>Quyidagi menyu bo‘limlari sen yuborgan screenshot’lardagi GUI bosqichlariga moslashtirilgan.</p>
+              <p>GUI ko‘rinishi o‘zgarmaydi. Faqat IP va PSK qiymatlari sening noutbuklaringga mos kiritiladi.</p>
             </div>
+
             <div className="hero-actions">
               <button className="btn secondary" onClick={handleCheck}>Check</button>
               <button className="btn danger" onClick={handleRemove}>Remove</button>
@@ -184,17 +185,29 @@ function App() {
             <div className="input-grid">
               <div className="field">
                 <label>Endpoint 1 / Local IP</label>
-                <input value={form.localIP} onChange={(e) => updateField('localIP', e.target.value)} placeholder="192.168.1.200" />
+                <input
+                  value={form.localIP}
+                  onChange={(e) => updateField('localIP', e.target.value)}
+                  placeholder="Masalan: 192.168.1.100"
+                />
               </div>
 
               <div className="field">
                 <label>Endpoint 2 / Remote IP yoki subnet</label>
-                <input value={form.remoteIP} onChange={(e) => updateField('remoteIP', e.target.value)} placeholder="192.168.1.30" />
+                <input
+                  value={form.remoteIP}
+                  onChange={(e) => updateField('remoteIP', e.target.value)}
+                  placeholder="Masalan: 192.168.1.200"
+                />
               </div>
 
               <div className="field field-full">
                 <label>Pre-Shared Key</label>
-                <input value={form.psk} onChange={(e) => updateField('psk', e.target.value)} placeholder="IPsuperSECRET" />
+                <input
+                  value={form.psk}
+                  onChange={(e) => updateField('psk', e.target.value)}
+                  placeholder="Masalan: test123"
+                />
               </div>
             </div>
           </section>

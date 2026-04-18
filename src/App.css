@@ -1,12 +1,9 @@
 :root {
   --bg: #081127;
   --panel: #0d1737;
-  --panel2: #121d42;
   --border: rgba(123, 140, 255, 0.22);
   --text: #e9efff;
   --muted: #9ca9cb;
-  --primary: #7c7cff;
-  --primary2: #695dff;
   --danger: #f07f73;
   --success: #66d38d;
 }
@@ -59,11 +56,6 @@ html, body, #root {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 24px;
-}
-
-.wizard-sidebar,
-.wizard-main {
-  min-width: 0;
 }
 
 .wizard-sidebar {
