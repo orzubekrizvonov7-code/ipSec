@@ -68,6 +68,7 @@ html, body, #root {
 .side-card,
 .hero-card,
 .input-card,
+.tools-card,
 .menu-card,
 .console-card {
   background: rgba(11, 20, 49, 0.86);
@@ -169,6 +170,28 @@ html, body, #root {
   transform: scale(1.15);
 }
 
+.role-box {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.role-btn {
+  flex: 1;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 18px;
+  background: #2a314e;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.role-btn.active {
+  background: linear-gradient(135deg, #6d74ff, #7665ff);
+}
+
 .wizard-main {
   display: flex;
   flex-direction: column;
@@ -224,7 +247,10 @@ html, body, #root {
   background: linear-gradient(135deg, #6d74ff, #7665ff);
 }
 
-.input-card {
+.input-card,
+.tools-card,
+.menu-card,
+.console-card {
   padding: 24px;
 }
 
@@ -260,13 +286,32 @@ html, body, #root {
   outline: none;
 }
 
-.menu-card {
-  padding: 24px;
+.field input:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
 }
 
+.tools-card h3,
 .menu-card h3 {
   margin: 0 0 20px;
   font-size: 24px;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.tool-btn {
+  border: none;
+  border-radius: 18px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #3040a0, #5565ff);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .wizard-grid {
@@ -317,10 +362,6 @@ html, body, #root {
   line-height: 1.45;
 }
 
-.console-card {
-  padding: 24px;
-}
-
 .console-head {
   display: flex;
   justify-content: space-between;
@@ -357,6 +398,10 @@ html, body, #root {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .hero-card h2 {
     font-size: 42px;
   }
@@ -368,7 +413,8 @@ html, body, #root {
   }
 
   .wizard-grid,
-  .input-grid {
+  .input-grid,
+  .tools-grid {
     grid-template-columns: 1fr;
   }
 

@@ -4,14 +4,23 @@ import './App.css'
 function App() {
   const api = window.ipsecAPI || {
     checkAdmin: async () => ({ ok: false, isAdmin: false, error: 'ipsecAPI topilmadi' }),
-    apply: async () => ({ ok: false, output: 'OK ishlamadi: ipsecAPI topilmadi' }),
-    check: async () => ({ ok: false, output: 'Check ishlamadi: ipsecAPI topilmadi' }),
-    remove: async () => ({ ok: false, output: 'Remove ishlamadi: ipsecAPI topilmadi' }),
+    apply: async () => ({ ok: false, output: 'OK ishlamadi' }),
+    check: async () => ({ ok: false, output: 'Check ishlamadi' }),
+    remove: async () => ({ ok: false, output: 'Remove ishlamadi' }),
+    runPing: async () => ({ ok: false, output: 'Ping ishlamadi' }),
+    checkIPConfig: async () => ({ ok: false, output: 'ipconfig ishlamadi' }),
+    checkGateway: async () => ({ ok: false, output: 'Gateway tekshiruvi ishlamadi' }),
+    checkTunnel: async () => ({ ok: false, output: 'Tunnel tekshiruvi ishlamadi' }),
+    saveClientConfig: async () => ({ ok: false, output: 'Config saqlash ishlamadi' }),
+    loadClientConfig: async () => ({ ok: false, output: 'Config yuklash ishlamadi' })
   }
 
+  const [role, setRole] = useState('server')
   const [form, setForm] = useState({
-    localIP: '192.168.1.100',
-    remoteIP: '192.168.1.200',
+    serverRealIP: '192.168.1.100',
+    clientRealIP: '192.168.1.200',
+    serverTunnelIP: '10.10.10.1',
+    clientTunnelIP: '10.10.10.2',
     psk: 'IPsuperSECRET',
 
     step1: true,
@@ -26,12 +35,6 @@ function App() {
     step10: true,
     step11: true,
     step12: true,
-
-    useIPsecRule: true,
-    useFirewallRule: true,
-    usePSK: true,
-    useIKEv2: true,
-    useCrypto: true,
 
     profileDomain: true,
     profilePrivate: true,
@@ -49,6 +52,9 @@ function App() {
     return Array.from({ length: 12 }, (_, i) => form[`step${i + 1}`]).filter(Boolean).length
   }, [form])
 
+  const localIP = role === 'server' ? form.serverTunnelIP : form.clientTunnelIP
+  const remoteIP = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
+
   function updateField(key, value) {
     setForm(prev => ({ ...prev, [key]: value }))
   }
@@ -59,14 +65,12 @@ function App() {
   }
 
   async function checkAdmin() {
-    appendLog('CHECK ADMIN', 'Administrator holati tekshirilmoqda...')
     try {
       const res = await api.checkAdmin()
       if (res.ok) {
         setIsAdmin(!!res.isAdmin)
         appendLog('CHECK ADMIN RESULT', res.isAdmin ? 'Administrator rejimi faol.' : 'Administrator rejimi faol emas.')
       } else {
-        setIsAdmin(false)
         appendLog('CHECK ADMIN ERROR', res.error || 'Noma’lum xato')
       }
     } catch (err) {
@@ -75,9 +79,22 @@ function App() {
   }
 
   async function handleApply() {
-    appendLog('OK BOSILDI', 'IPSec sozlash boshlandi...')
+    appendLog('OK BOSILDI', `${role.toUpperCase()} rejimida IPSec sozlash boshlandi...`)
     try {
-      const res = await api.apply(form)
+      const payload = {
+        role,
+        localIP,
+        remoteIP,
+        serverRealIP: form.serverRealIP,
+        clientRealIP: form.clientRealIP,
+        serverTunnelIP: form.serverTunnelIP,
+        clientTunnelIP: form.clientTunnelIP,
+        psk: form.psk,
+        profileDomain: form.profileDomain,
+        profilePrivate: form.profilePrivate,
+        profilePublic: form.profilePublic
+      }
+      const res = await api.apply(payload)
       appendLog('OK / APPLY RESULT', res?.output || 'Natija yo‘q')
     } catch (err) {
       appendLog('OK / APPLY ERROR', String(err))
@@ -85,38 +102,85 @@ function App() {
   }
 
   async function handleCheck() {
-    appendLog('CHECK BOSILDI', 'Mavjud IPSec qoidalar tekshirilmoqda...')
-    try {
-      const res = await api.check()
-      appendLog('CHECK RESULT', res?.output || 'Natija yo‘q')
-    } catch (err) {
-      appendLog('CHECK ERROR', String(err))
-    }
+    const res = await api.check()
+    appendLog('CHECK RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleRemove() {
-    appendLog('REMOVE BOSILDI', 'IPSec qoidalari o‘chirilyapti...')
-    try {
-      const res = await api.remove()
-      appendLog('REMOVE RESULT', res?.output || 'Natija yo‘q')
-    } catch (err) {
-      appendLog('REMOVE ERROR', String(err))
+    const res = await api.remove()
+    appendLog('REMOVE RESULT', res?.output || 'Natija yo‘q')
+  }
+
+  async function handlePing() {
+    const target = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
+    appendLog('PING TEST', `${target} manziliga ping yuborilmoqda...`)
+    const res = await api.runPing(target)
+    appendLog('PING RESULT', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleIPConfig() {
+    const res = await api.checkIPConfig()
+    appendLog('IPCONFIG RESULT', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleGateway() {
+    const res = await api.checkGateway()
+    appendLog('GATEWAY RESULT', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleTunnel() {
+    const res = await api.checkTunnel()
+    appendLog('TUNNEL RESULT', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleSaveClientConfig() {
+    const payload = {
+      serverRealIP: form.serverRealIP,
+      clientRealIP: form.clientRealIP,
+      serverTunnelIP: form.serverTunnelIP,
+      clientTunnelIP: form.clientTunnelIP,
+      psk: form.psk,
+      profileDomain: form.profileDomain,
+      profilePrivate: form.profilePrivate,
+      profilePublic: form.profilePublic
+    }
+    const res = await api.saveClientConfig(payload)
+    appendLog('SAVE CLIENT CONFIG', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleLoadClientConfig() {
+    const res = await api.loadClientConfig()
+    appendLog('LOAD CLIENT CONFIG', res?.output || 'Natija yo‘q')
+
+    if (res?.ok && res?.config) {
+      setRole('client')
+      setForm(prev => ({
+        ...prev,
+        serverRealIP: res.config.serverRealIP || prev.serverRealIP,
+        clientRealIP: res.config.clientRealIP || prev.clientRealIP,
+        serverTunnelIP: res.config.serverTunnelIP || prev.serverTunnelIP,
+        clientTunnelIP: res.config.clientTunnelIP || prev.clientTunnelIP,
+        psk: res.config.psk || prev.psk,
+        profileDomain: !!res.config.profileDomain,
+        profilePrivate: !!res.config.profilePrivate,
+        profilePublic: !!res.config.profilePublic
+      }))
     }
   }
 
   const steps = [
-    { key: 'step1', num: 1, title: 'wf.msc / Connection Security Rules', desc: 'Windows Defender Firewall with Advanced Security konsolini ochish va New Rule boshlash.' },
-    { key: 'step2', num: 2, title: 'Custom rule', desc: 'Rule Type oynasida Custom tanlanadi.' },
-    { key: 'step3', num: 3, title: 'Endpoint 1 IP', desc: 'Endpoint 1 uchun local server yoki noutbuk IP kiritiladi.' },
-    { key: 'step4', num: 4, title: 'Endpoint 2 IP', desc: 'Endpoint 2 uchun client noutbuk IP yoki subnet kiritiladi.' },
-    { key: 'step5', num: 5, title: 'Require authentication', desc: 'Inbound va outbound trafik uchun autentifikatsiya talab qilinadi.' },
-    { key: 'step6', num: 6, title: 'Advanced + PreShared Key', desc: 'Customize ichidan PSK yoqiladi.' },
-    { key: 'step7', num: 7, title: 'Protocol Any', desc: 'Connection security rule uchun Any protokol ishlatiladi.' },
-    { key: 'step8', num: 8, title: 'Profiles', desc: 'Domain, Private, Public profillari tanlanadi.' },
-    { key: 'step9', num: 9, title: 'IKEv2', desc: 'Key exchange moduli sifatida IKEv2 yoqiladi.' },
-    { key: 'step10', num: 10, title: 'AES256 / SHA256', desc: 'Quick Mode uchun kuchli kripto algoritmlar ishlatiladi.' },
-    { key: 'step11', num: 11, title: 'Firewall Rule', desc: 'Inbound uchun IPSec-trafikka ruxsat beruvchi qoida yaratiladi.' },
-    { key: 'step12', num: 12, title: 'Rule name / Finish', desc: 'Sozlash yakunlanadi va qoida nomi belgilanadi.' },
+    { key: 'step1', num: 1, title: 'Connection Security Rules', desc: 'Firewall oynasida IPSec qoida yaratish oynasi ochiladi.' },
+    { key: 'step2', num: 2, title: 'Custom Rule', desc: 'Custom turdagi xavfsizlik qoidasi tanlanadi.' },
+    { key: 'step3', num: 3, title: 'Endpoint 1', desc: 'Local qurilmaning tunnel manzili ishlatiladi.' },
+    { key: 'step4', num: 4, title: 'Endpoint 2', desc: 'Remote qurilmaning tunnel manzili ishlatiladi.' },
+    { key: 'step5', num: 5, title: 'Authentication', desc: 'Inbound va outbound uchun autentifikatsiya talab qilinadi.' },
+    { key: 'step6', num: 6, title: 'Pre-Shared Key', desc: 'PSK asosida xavfsiz ulanish sozlanadi.' },
+    { key: 'step7', num: 7, title: 'Protocol', desc: 'Any protokol bilan qoida ishlaydi.' },
+    { key: 'step8', num: 8, title: 'Profiles', desc: 'Domain, Private va Public profillar belgilanadi.' },
+    { key: 'step9', num: 9, title: 'IKEv2', desc: 'Key exchange moduli sifatida IKEv2 ishlatiladi.' },
+    { key: 'step10', num: 10, title: 'AES256 / SHA256', desc: 'Kuchli shifrlash algoritmlari yoqiladi.' },
+    { key: 'step11', num: 11, title: 'Firewall Rule', desc: 'IPSec-trafik uchun ruxsat qoidasi yaratiladi.' },
+    { key: 'step12', num: 12, title: 'Finish', desc: 'Sozlash yakunlanadi va nom beriladi.' },
   ]
 
   return (
@@ -130,7 +194,7 @@ function App() {
             <div className="brand-icon">🛡️</div>
             <div>
               <h1>IPSec Wizard</h1>
-              <p>Windows Server va Windows noutbuklar uchun IPSec boshqaruvi</p>
+              <p>Server va client o‘rtasida xavfsiz tunnel boshqaruvi</p>
             </div>
           </div>
 
@@ -139,15 +203,38 @@ function App() {
               <span className={`status-dot ${isAdmin ? 'ok' : 'warn'}`}></span>
               <div>
                 <strong>{isAdmin ? 'Administrator rejimi faol' : 'Administrator rejimi faol emas'}</strong>
-                <p>OK bosilganda PowerShell orqali qoida yaratiladi</p>
+                <p>Sozlashlar PowerShell orqali bajariladi</p>
               </div>
             </div>
           </div>
 
           <div className="side-card">
+            <h3>Rejim tanlash</h3>
+            <div className="role-box">
+              <button
+                className={`role-btn ${role === 'server' ? 'active' : ''}`}
+                onClick={() => setRole('server')}
+              >
+                Server
+              </button>
+              <button
+                className={`role-btn ${role === 'client' ? 'active' : ''}`}
+                onClick={() => setRole('client')}
+              >
+                Client
+              </button>
+            </div>
+            <p>
+              {role === 'server'
+                ? 'Server client uchun tunnel IP beradi va boshqaradi.'
+                : 'Client faqat server belgilagan tunnel ma’lumotlarini ko‘radi.'}
+            </p>
+          </div>
+
+          <div className="side-card">
             <h3>Tanlangan bosqichlar</h3>
             <div className="big-count">{selectedCount} / 12</div>
-            <p>Barcha bosqichlar galochka bilan yoqiladi yoki o‘chiriladi.</p>
+            <p>Barcha bosqichlar galichka bilan yoqiladi yoki o‘chiriladi.</p>
           </div>
 
           <div className="side-card">
@@ -170,8 +257,8 @@ function App() {
         <main className="wizard-main">
           <section className="hero-card">
             <div>
-              <h2>Rasmdagi IPSec wizard bosqichlari</h2>
-              <p>GUI ko‘rinishi o‘zgarmaydi. Faqat IP va PSK qiymatlari sening noutbuklaringga mos kiritiladi.</p>
+              <h2>IPSec Tunnel Boshqaruvi</h2>
+              <p>Server va client qurilmalar o‘rtasida xavfsiz tunnel yaratish va nazorat qilish oynasi.</p>
             </div>
 
             <div className="hero-actions">
@@ -184,20 +271,42 @@ function App() {
           <section className="input-card">
             <div className="input-grid">
               <div className="field">
-                <label>Endpoint 1 / Local IP</label>
+                <label>Server Real IP</label>
                 <input
-                  value={form.localIP}
-                  onChange={(e) => updateField('localIP', e.target.value)}
-                  placeholder="Masalan: 192.168.1.100"
+                  value={form.serverRealIP}
+                  onChange={(e) => updateField('serverRealIP', e.target.value)}
+                  placeholder="192.168.1.100"
+                  disabled={role === 'client'}
                 />
               </div>
 
               <div className="field">
-                <label>Endpoint 2 / Remote IP yoki subnet</label>
+                <label>Client Real IP</label>
                 <input
-                  value={form.remoteIP}
-                  onChange={(e) => updateField('remoteIP', e.target.value)}
-                  placeholder="Masalan: 192.168.1.200"
+                  value={form.clientRealIP}
+                  onChange={(e) => updateField('clientRealIP', e.target.value)}
+                  placeholder="192.168.1.200"
+                  disabled={role === 'client'}
+                />
+              </div>
+
+              <div className="field">
+                <label>Server Tunnel IP</label>
+                <input
+                  value={form.serverTunnelIP}
+                  onChange={(e) => updateField('serverTunnelIP', e.target.value)}
+                  placeholder="10.10.10.1"
+                  disabled={role === 'client'}
+                />
+              </div>
+
+              <div className="field">
+                <label>Client Tunnel IP</label>
+                <input
+                  value={form.clientTunnelIP}
+                  onChange={(e) => updateField('clientTunnelIP', e.target.value)}
+                  placeholder="10.10.10.2"
+                  disabled={role === 'client'}
                 />
               </div>
 
@@ -207,13 +316,31 @@ function App() {
                   value={form.psk}
                   onChange={(e) => updateField('psk', e.target.value)}
                   placeholder="Masalan: test123"
+                  disabled={role === 'client'}
                 />
               </div>
             </div>
           </section>
 
+          <section className="tools-card">
+            <h3>Ishlash Tekshiruvi</h3>
+            <div className="tools-grid">
+              <button className="tool-btn" onClick={handlePing}>
+                {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
+              </button>
+              <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
+              <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
+              <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
+              {role === 'server' ? (
+                <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
+              ) : (
+                <button className="tool-btn" onClick={handleLoadClientConfig}>Server Config Yuklash</button>
+              )}
+            </div>
+          </section>
+
           <section className="menu-card">
-            <h3>Wizard Menu</h3>
+            <h3>IPSec Ishlash Jarayoni</h3>
             <div className="wizard-grid">
               {steps.map((step) => (
                 <label className="wizard-step" key={step.key}>

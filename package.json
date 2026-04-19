@@ -3,7 +3,6 @@
   "private": true,
   "version": "1.0.0",
   "description": "Windows Server IPSec wizard app",
-  "author": "orzubek",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",

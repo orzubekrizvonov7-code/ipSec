@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const fs = require('fs');
+const { spawn, exec } = require('child_process');
 
 const RULE_NAME = 'IPSecWizardRule';
 const FW_NAME = 'IPSecWizardFirewall';
@@ -10,7 +11,9 @@ const QM_NAME = 'IPSecWizardQM';
 function createWindow() {
   const win = new BrowserWindow({
     width: 1600,
-    height: 950,
+    height: 980,
+    minWidth: 1300,
+    minHeight: 850,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -63,6 +66,14 @@ function runPowerShell(script) {
   });
 }
 
+function execCommand(command, shell = 'cmd.exe') {
+  return new Promise((resolve) => {
+    exec(command, { shell, windowsHide: true }, (err, stdout, stderr) => {
+      resolve({ ok: !err, output: (stdout || stderr || (err ? String(err) : '')).trim() });
+    });
+  });
+}
+
 function escPsSingle(str = '') {
   return String(str).replace(/'/g, "''");
 }
@@ -91,6 +102,7 @@ function buildApplyScript(config) {
   lines.push(`$localIP = '${localIP}'`);
   lines.push(`$remoteIP = '${remoteIP}'`);
   lines.push(`$profileValue = '${profileValue}'`);
+  lines.push(`$pskValue = '${psk}'`);
 
   lines.push(`if ([string]::IsNullOrWhiteSpace($localIP)) { throw 'Local IP kiritilmagan.' }`);
   lines.push(`if ([string]::IsNullOrWhiteSpace($remoteIP)) { throw 'Remote IP kiritilmagan.' }`);
@@ -100,48 +112,30 @@ function buildApplyScript(config) {
   lines.push(`Remove-NetIPsecPhase1AuthSet -DisplayName $authName -ErrorAction SilentlyContinue`);
   lines.push(`Remove-NetIPsecQuickModeCryptoSet -DisplayName $qmName -ErrorAction SilentlyContinue`);
 
-  if (config.usePSK) {
-    lines.push(`if ([string]::IsNullOrWhiteSpace('${psk}')) { throw 'PSK bo‘sh bo‘lishi mumkin emas.' }`);
-    lines.push(`$authProp = New-NetIPsecAuthProposal -Machine -PreSharedKey '${psk}'`);
-    lines.push(`$authSet = New-NetIPsecPhase1AuthSet -DisplayName $authName -Name $authName -Proposal $authProp`);
-  }
+  lines.push(`if ([string]::IsNullOrWhiteSpace($pskValue)) { throw 'PSK bo‘sh bo‘lishi mumkin emas.' }`);
+  lines.push(`$authProp = New-NetIPsecAuthProposal -Machine -PreSharedKey $pskValue`);
+  lines.push(`$authSet = New-NetIPsecPhase1AuthSet -DisplayName $authName -Name $authName -Proposal $authProp`);
 
-  if (config.useCrypto) {
-    lines.push(`$qmProp = New-NetIPsecQuickModeCryptoProposal -Encapsulation ESP -Encryption AES256 -ESPHash SHA256`);
-    lines.push(`$qmSet = New-NetIPsecQuickModeCryptoSet -DisplayName $qmName -Name $qmName -Proposal $qmProp`);
-  }
+  lines.push(`$qmProp = New-NetIPsecQuickModeCryptoProposal -Encapsulation ESP -Encryption AES256 -ESPHash SHA256`);
+  lines.push(`$qmSet = New-NetIPsecQuickModeCryptoSet -DisplayName $qmName -Name $qmName -Proposal $qmProp`);
 
-  if (config.useIPsecRule) {
-    lines.push(`$params = @{`);
-    lines.push(`  DisplayName = $ruleName`);
-    lines.push(`  Name = $ruleName`);
-    lines.push(`  Enabled = 'True'`);
-    lines.push(`  Mode = 'Transport'`);
-    lines.push(`  LocalAddress = $localIP`);
-    lines.push(`  RemoteAddress = $remoteIP`);
-    lines.push(`  InboundSecurity = 'Require'`);
-    lines.push(`  OutboundSecurity = 'Require'`);
-    lines.push(`  Profile = $profileValue`);
-    lines.push(`}`);
+  lines.push(`$params = @{`);
+  lines.push(`  DisplayName = $ruleName`);
+  lines.push(`  Name = $ruleName`);
+  lines.push(`  Enabled = 'True'`);
+  lines.push(`  Mode = 'Transport'`);
+  lines.push(`  LocalAddress = $localIP`);
+  lines.push(`  RemoteAddress = $remoteIP`);
+  lines.push(`  InboundSecurity = 'Require'`);
+  lines.push(`  OutboundSecurity = 'Require'`);
+  lines.push(`  Profile = $profileValue`);
+  lines.push(`  Phase1AuthSet = $authSet.Name`);
+  lines.push(`  KeyModule = 'IKEv2'`);
+  lines.push(`  QuickModeCryptoSet = $qmSet.Name`);
+  lines.push(`}`);
+  lines.push(`New-NetIPsecRule @params | Out-Null`);
 
-    if (config.usePSK) {
-      lines.push(`$params['Phase1AuthSet'] = $authSet.Name`);
-    }
-
-    if (config.useIKEv2) {
-      lines.push(`$params['KeyModule'] = 'IKEv2'`);
-    }
-
-    if (config.useCrypto) {
-      lines.push(`$params['QuickModeCryptoSet'] = $qmSet.Name`);
-    }
-
-    lines.push(`New-NetIPsecRule @params | Out-Null`);
-  }
-
-  if (config.useFirewallRule) {
-    lines.push(`New-NetFirewallRule -DisplayName $fwName -Direction Inbound -Enabled True -Profile $profileValue -Action Allow -Protocol Any -Authentication Required -Encryption Dynamic | Out-Null`);
-  }
+  lines.push(`New-NetFirewallRule -DisplayName $fwName -Direction Inbound -Enabled True -Profile $profileValue -Action Allow -Protocol Any -Authentication Required -Encryption Dynamic | Out-Null`);
 
   lines.push(`Write-Output 'IPSec konfiguratsiyasi muvaffaqiyatli yaratildi.'`);
   lines.push(`Write-Output ''`);
@@ -208,6 +202,9 @@ ipcMain.handle('check-admin', async () => {
 
 ipcMain.handle('apply-ipsec', async (_event, config) => {
   try {
+    if (config.role === 'client' && !config.serverTunnelIP) {
+      return { ok: false, output: 'Client uchun server config yuklanmagan.' };
+    }
     return await runPowerShell(buildApplyScript(config));
   } catch (err) {
     return { ok: false, output: err.message };
@@ -225,6 +222,94 @@ ipcMain.handle('check-ipsec', async () => {
 ipcMain.handle('remove-ipsec', async () => {
   try {
     return await runPowerShell(buildRemoveScript());
+  } catch (err) {
+    return { ok: false, output: err.message };
+  }
+});
+
+ipcMain.handle('run-ping', async (_event, ip) => {
+  const safeIp = String(ip || '').trim();
+  if (!safeIp) {
+    return { ok: false, output: 'Ping uchun IP kiritilmagan.' };
+  }
+  return await execCommand(`ping ${safeIp}`);
+});
+
+ipcMain.handle('check-ipconfig', async () => {
+  return await execCommand('ipconfig /all');
+});
+
+ipcMain.handle('check-gateway', async () => {
+  return await execCommand('route print');
+});
+
+ipcMain.handle('check-tunnel', async () => {
+  const ps = `
+$ErrorActionPreference = 'SilentlyContinue'
+Write-Output '=== Main Mode SA ==='
+Get-NetIPsecMainModeSA | Format-Table -AutoSize | Out-String
+Write-Output '=== Quick Mode SA ==='
+Get-NetIPsecQuickModeSA | Format-Table -AutoSize | Out-String
+`;
+  try {
+    return await runPowerShell(ps);
+  } catch (err) {
+    return { ok: false, output: err.message };
+  }
+});
+
+ipcMain.handle('save-client-config', async (_event, config) => {
+  try {
+    const data = {
+      role: 'client',
+      serverRealIP: config.serverRealIP,
+      clientRealIP: config.clientRealIP,
+      serverTunnelIP: config.serverTunnelIP,
+      clientTunnelIP: config.clientTunnelIP,
+      psk: config.psk,
+      profileDomain: !!config.profileDomain,
+      profilePrivate: !!config.profilePrivate,
+      profilePublic: !!config.profilePublic
+    };
+
+    const result = await dialog.showSaveDialog({
+      title: 'Client konfiguratsiyasini saqlash',
+      defaultPath: 'ipsec-client-config.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { ok: false, output: 'Saqlash bekor qilindi.' };
+    }
+
+    fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), 'utf8');
+    return { ok: true, output: `Config saqlandi:\n${result.filePath}` };
+  } catch (err) {
+    return { ok: false, output: err.message };
+  }
+});
+
+ipcMain.handle('load-client-config', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Client konfiguratsiyasini yuklash',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (result.canceled || !result.filePaths.length) {
+      return { ok: false, output: 'Yuklash bekor qilindi.' };
+    }
+
+    const filePath = result.filePaths[0];
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(raw);
+
+    return {
+      ok: true,
+      output: `Config yuklandi:\n${filePath}`,
+      config: data
+    };
   } catch (err) {
     return { ok: false, output: err.message };
   }
