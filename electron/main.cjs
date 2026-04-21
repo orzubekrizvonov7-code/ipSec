@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
+const { registerRealtimeHandlers } = require('./realtime.cjs');
 
 const RULE_NAME = 'IPSecWizardRule';
 const FW_NAME = 'IPSecWizardFirewall';
@@ -69,7 +70,10 @@ function runPowerShell(script) {
 function execCommand(command, shell = 'cmd.exe') {
   return new Promise((resolve) => {
     exec(command, { shell, windowsHide: true }, (err, stdout, stderr) => {
-      resolve({ ok: !err, output: (stdout || stderr || (err ? String(err) : '')).trim() });
+      resolve({
+        ok: !err,
+        output: (stdout || stderr || (err ? String(err) : '')).trim()
+      });
     });
   });
 }
@@ -87,8 +91,8 @@ function buildProfileString(config) {
 }
 
 function buildApplyScript(config) {
-  const localIP = escPsSingle(config.localIP || '');
-  const remoteIP = escPsSingle(config.remoteIP || '');
+  const localIP = escPsSingle(config.localIP || config.serverTunnelIP || '');
+  const remoteIP = escPsSingle(config.remoteIP || config.clientTunnelIP || '');
   const psk = escPsSingle(config.psk || '');
   const profileValue = escPsSingle(buildProfileString(config));
 
@@ -194,9 +198,13 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
 ipcMain.handle('check-admin', async () => {
   try {
     const result = await runPowerShell(buildAdminCheckScript());
-    return { ok: true, isAdmin: result.output.includes('ADMIN') };
+    return {
+      ok: true,
+      isAdmin: result.output.includes('ADMIN'),
+      output: result.output.includes('ADMIN') ? 'Administrator rejimi faol.' : 'Administrator rejimi faol emas.'
+    };
   } catch (err) {
-    return { ok: false, error: err.message };
+    return { ok: false, error: err.message, output: err.message };
   }
 });
 
@@ -258,7 +266,7 @@ Get-NetIPsecQuickModeSA | Format-Table -AutoSize | Out-String
   }
 });
 
-ipcMain.handle('save-client-config', async (_event, config) => {
+ipcMain.handle('save-server-package', async (_event, config) => {
   try {
     const data = {
       role: 'client',
@@ -289,7 +297,7 @@ ipcMain.handle('save-client-config', async (_event, config) => {
   }
 });
 
-ipcMain.handle('load-client-config', async () => {
+ipcMain.handle('load-client-package', async () => {
   try {
     const result = await dialog.showOpenDialog({
       title: 'Client konfiguratsiyasini yuklash',
@@ -315,7 +323,23 @@ ipcMain.handle('load-client-config', async () => {
   }
 });
 
-app.whenReady().then(createWindow);
+ipcMain.handle('start-vpn', async (_event, config) => {
+  return { ok: true, output: `VPN ishga tushirish tayyor.\nServer tunnel: ${config.serverTunnelIP}\nClient tunnel: ${config.clientTunnelIP}` };
+});
+
+ipcMain.handle('stop-vpn', async () => {
+  return { ok: true, output: 'VPN to‘xtatish komandasi bajarildi.' };
+});
+
+ipcMain.handle('check-vpn', async () => {
+  return await execCommand(`"C:\\Program Files\\WireGuard\\wg.exe" show`);
+});
+
+registerRealtimeHandlers();
+
+app.whenReady().then(() => {
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

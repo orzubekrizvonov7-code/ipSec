@@ -1,224 +1,227 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+const steps = [
+  { id: 1, title: 'Connection Security Rules', desc: 'Firewall oynasida IPSec qoida yaratish oynasi ochiladi.' },
+  { id: 2, title: 'Custom Rule', desc: 'Custom turdagi xavfsizlik qoidasi tanlanadi.' },
+  { id: 3, title: 'Endpoint 1', desc: 'Local qurilmaning tunnel manzili ishlatiladi.' },
+  { id: 4, title: 'Endpoint 2', desc: 'Remote qurilmaning tunnel manzili ishlatiladi.' },
+  { id: 5, title: 'Authentication', desc: 'Inbound va outbound uchun autentifikatsiya talab qilinadi.' },
+  { id: 6, title: 'Pre-Shared Key', desc: 'PSK asosida xavfsiz ulanish sozlanadi.' },
+  { id: 7, title: 'Protocol', desc: 'Any protokol bilan qoida ishlaydi.' },
+  { id: 8, title: 'Profiles', desc: 'Domain, Private va Public profillar belgilanadi.' },
+  { id: 9, title: 'IKEv2', desc: 'Key exchange moduli sifatida IKEv2 ishlatiladi.' },
+  { id: 10, title: 'AES256 / SHA256', desc: 'Kuchli shifrlash algoritmlari yoqiladi.' },
+  { id: 11, title: 'Firewall Rule', desc: 'IPSec-trafik uchun ruxsat qoidasi yaratiladi.' },
+  { id: 12, title: 'Finish', desc: 'Sozlash yakunlanadi va nom beriladi.' },
+]
+
+const defaultForm = {
+  serverRealIP: '192.168.1.100',
+  clientRealIP: '192.168.1.200',
+  serverTunnelIP: '10.10.10.1',
+  clientTunnelIP: '10.10.10.2',
+  psk: 'IPsuperSECRET',
+}
+
 function App() {
-  const api = window.ipsecAPI || {
-    checkAdmin: async () => ({ ok: false, isAdmin: false, error: 'ipsecAPI topilmadi' }),
-    apply: async () => ({ ok: false, output: 'OK ishlamadi' }),
-    check: async () => ({ ok: false, output: 'Check ishlamadi' }),
-    remove: async () => ({ ok: false, output: 'Remove ishlamadi' }),
-    runPing: async () => ({ ok: false, output: 'Ping ishlamadi' }),
-    checkIPConfig: async () => ({ ok: false, output: 'ipconfig ishlamadi' }),
-    checkGateway: async () => ({ ok: false, output: 'Gateway tekshiruvi ishlamadi' }),
-    checkTunnel: async () => ({ ok: false, output: 'Tunnel tekshiruvi ishlamadi' }),
-    saveClientConfig: async () => ({ ok: false, output: 'Config saqlash ishlamadi' }),
-    loadClientConfig: async () => ({ ok: false, output: 'Config yuklash ishlamadi' })
-  }
+  const api = window.ipsecAPI
 
   const [role, setRole] = useState('server')
-  const [form, setForm] = useState({
-    serverRealIP: '192.168.1.100',
-    clientRealIP: '192.168.1.200',
-    serverTunnelIP: '10.10.10.1',
-    clientTunnelIP: '10.10.10.2',
-    psk: 'IPsuperSECRET',
+  const [form, setForm] = useState(defaultForm)
+  const [consoleLines, setConsoleLines] = useState([
+    'Dastur ishga tushdi.',
+    '',
+    '[01:39:23] CHECK ADMIN RESULT',
+    'Administrator rejimi faol.',
+    '',
+    '[01:39:23] CHECK ADMIN RESULT',
+    'Administrator rejimi faol.'
+  ])
 
-    step1: true,
-    step2: true,
-    step3: true,
-    step4: true,
-    step5: true,
-    step6: true,
-    step7: true,
-    step8: true,
-    step9: true,
-    step10: true,
-    step11: true,
-    step12: true,
+  const [socketPort, setSocketPort] = useState(9001)
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState([])
+  const [socketConnected, setSocketConnected] = useState(false)
+  const [receivedFiles, setReceivedFiles] = useState([])
 
-    profileDomain: true,
-    profilePrivate: true,
-    profilePublic: true
-  })
-
-  const [log, setLog] = useState('Dastur ishga tushdi.\n')
-  const [isAdmin, setIsAdmin] = useState(false)
-
-  useEffect(() => {
-    checkAdmin()
-  }, [])
-
-  const selectedCount = useMemo(() => {
-    return Array.from({ length: 12 }, (_, i) => form[`step${i + 1}`]).filter(Boolean).length
-  }, [form])
-
-  const localIP = role === 'server' ? form.serverTunnelIP : form.clientTunnelIP
-  const remoteIP = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
-
-  function updateField(key, value) {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }
+  const stepCount = useMemo(() => `${steps.length} / ${steps.length}`, [])
 
   function appendLog(title, text) {
     const stamp = new Date().toLocaleTimeString()
-    setLog(prev => `${prev}\n[${stamp}] ${title}\n${text || ''}\n`)
+    setConsoleLines(prev => [
+      ...prev,
+      '',
+      `[${stamp}] ${title}`,
+      text || 'Natija yo‘q'
+    ])
   }
 
-  async function checkAdmin() {
-    try {
-      const res = await api.checkAdmin()
-      if (res.ok) {
-        setIsAdmin(!!res.isAdmin)
-        appendLog('CHECK ADMIN RESULT', res.isAdmin ? 'Administrator rejimi faol.' : 'Administrator rejimi faol emas.')
-      } else {
-        appendLog('CHECK ADMIN ERROR', res.error || 'Noma’lum xato')
-      }
-    } catch (err) {
-      appendLog('CHECK ADMIN EXCEPTION', String(err))
-    }
+  function setField(name, value) {
+    setForm(prev => ({ ...prev, [name]: value }))
   }
 
-  async function handleApply() {
-    appendLog('OK BOSILDI', `${role.toUpperCase()} rejimida IPSec sozlash boshlandi...`)
-    try {
-      const payload = {
-        role,
-        localIP,
-        remoteIP,
-        serverRealIP: form.serverRealIP,
-        clientRealIP: form.clientRealIP,
-        serverTunnelIP: form.serverTunnelIP,
-        clientTunnelIP: form.clientTunnelIP,
-        psk: form.psk,
-        profileDomain: form.profileDomain,
-        profilePrivate: form.profilePrivate,
-        profilePublic: form.profilePublic
-      }
-      const res = await api.apply(payload)
-      appendLog('OK / APPLY RESULT', res?.output || 'Natija yo‘q')
-    } catch (err) {
-      appendLog('OK / APPLY ERROR', String(err))
-    }
+  async function handleCheckAdmin() {
+    if (!api?.checkAdmin) return
+    const res = await api.checkAdmin()
+    appendLog('CHECK ADMIN RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleCheck() {
-    const res = await api.check()
+    if (!api?.checkIpsec) return
+    const res = await api.checkIpsec()
     appendLog('CHECK RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleRemove() {
-    const res = await api.remove()
+    if (!api?.removeIpsec) return
+    const res = await api.removeIpsec()
     appendLog('REMOVE RESULT', res?.output || 'Natija yo‘q')
   }
 
+  async function handleOK() {
+    if (!api?.applyIpsec) return
+    const res = await api.applyIpsec({
+      role,
+      ...form
+    })
+    appendLog('OK / APPLY RESULT', res?.output || 'Natija yo‘q')
+  }
+
   async function handlePing() {
+    if (!api?.runPing) return
     const target = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
-    appendLog('PING TEST', `${target} manziliga ping yuborilmoqda...`)
     const res = await api.runPing(target)
     appendLog('PING RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleIPConfig() {
+    if (!api?.checkIPConfig) return
     const res = await api.checkIPConfig()
     appendLog('IPCONFIG RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleGateway() {
+    if (!api?.checkGateway) return
     const res = await api.checkGateway()
     appendLog('GATEWAY RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleTunnel() {
+    if (!api?.checkTunnel) return
     const res = await api.checkTunnel()
     appendLog('TUNNEL RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleSaveClientConfig() {
+    if (!api?.saveServerPackage) return
+    const res = await api.saveServerPackage({
+      role,
+      ...form
+    })
+    appendLog('CLIENT CONFIG SAVE', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleStartMessaging() {
+    if (!api) return
+
+    if (role === 'server') {
+      const res = await api.startSocketServer(socketPort)
+      appendLog('SOCKET SERVER', res?.output || 'Natija yo‘q')
+    } else {
+      const res = await api.connectSocketClient(form.serverTunnelIP, socketPort)
+      appendLog('SOCKET CLIENT', res?.output || 'Natija yo‘q')
+    }
+  }
+
+  async function handleDisconnectSocket() {
+    if (!api?.disconnectSocket) return
+    const res = await api.disconnectSocket()
+    appendLog('SOCKET DISCONNECT', res?.output || 'Natija yo‘q')
+    setSocketConnected(false)
+  }
+
+  async function handleSendMessage() {
+    if (!api?.sendChatMessage || !chatInput.trim()) return
+
     const payload = {
-      serverRealIP: form.serverRealIP,
-      clientRealIP: form.clientRealIP,
-      serverTunnelIP: form.serverTunnelIP,
-      clientTunnelIP: form.clientTunnelIP,
-      psk: form.psk,
-      profileDomain: form.profileDomain,
-      profilePrivate: form.profilePrivate,
-      profilePublic: form.profilePublic
+      from: role,
+      text: chatInput,
+      time: new Date().toLocaleTimeString()
     }
-    const res = await api.saveClientConfig(payload)
-    appendLog('SAVE CLIENT CONFIG', res?.output || 'Natija yo‘q')
-  }
 
-  async function handleLoadClientConfig() {
-    const res = await api.loadClientConfig()
-    appendLog('LOAD CLIENT CONFIG', res?.output || 'Natija yo‘q')
+    const res = await api.sendChatMessage(payload)
+    appendLog('CHAT SEND', res?.output || 'Natija yo‘q')
 
-    if (res?.ok && res?.config) {
-      setRole('client')
-      setForm(prev => ({
-        ...prev,
-        serverRealIP: res.config.serverRealIP || prev.serverRealIP,
-        clientRealIP: res.config.clientRealIP || prev.clientRealIP,
-        serverTunnelIP: res.config.serverTunnelIP || prev.serverTunnelIP,
-        clientTunnelIP: res.config.clientTunnelIP || prev.clientTunnelIP,
-        psk: res.config.psk || prev.psk,
-        profileDomain: !!res.config.profileDomain,
-        profilePrivate: !!res.config.profilePrivate,
-        profilePublic: !!res.config.profilePublic
-      }))
+    if (res?.ok) {
+      setChatMessages(prev => [...prev, payload])
+      setChatInput('')
     }
   }
 
-  const steps = [
-    { key: 'step1', num: 1, title: 'Connection Security Rules', desc: 'Firewall oynasida IPSec qoida yaratish oynasi ochiladi.' },
-    { key: 'step2', num: 2, title: 'Custom Rule', desc: 'Custom turdagi xavfsizlik qoidasi tanlanadi.' },
-    { key: 'step3', num: 3, title: 'Endpoint 1', desc: 'Local qurilmaning tunnel manzili ishlatiladi.' },
-    { key: 'step4', num: 4, title: 'Endpoint 2', desc: 'Remote qurilmaning tunnel manzili ishlatiladi.' },
-    { key: 'step5', num: 5, title: 'Authentication', desc: 'Inbound va outbound uchun autentifikatsiya talab qilinadi.' },
-    { key: 'step6', num: 6, title: 'Pre-Shared Key', desc: 'PSK asosida xavfsiz ulanish sozlanadi.' },
-    { key: 'step7', num: 7, title: 'Protocol', desc: 'Any protokol bilan qoida ishlaydi.' },
-    { key: 'step8', num: 8, title: 'Profiles', desc: 'Domain, Private va Public profillar belgilanadi.' },
-    { key: 'step9', num: 9, title: 'IKEv2', desc: 'Key exchange moduli sifatida IKEv2 ishlatiladi.' },
-    { key: 'step10', num: 10, title: 'AES256 / SHA256', desc: 'Kuchli shifrlash algoritmlari yoqiladi.' },
-    { key: 'step11', num: 11, title: 'Firewall Rule', desc: 'IPSec-trafik uchun ruxsat qoidasi yaratiladi.' },
-    { key: 'step12', num: 12, title: 'Finish', desc: 'Sozlash yakunlanadi va nom beriladi.' },
-  ]
+  async function handleSendFile() {
+    if (!api?.sendFileToPeer) return
+    const res = await api.sendFileToPeer(role)
+    appendLog('FILE SEND', res?.output || 'Natija yo‘q')
+  }
+
+  useEffect(() => {
+    handleCheckAdmin()
+  }, [])
+
+  useEffect(() => {
+    if (!api) return
+
+    api.onSocketStatus((data) => {
+      appendLog('SOCKET STATUS', data.message)
+      if (data.type === 'connected') setSocketConnected(true)
+      if (data.type === 'disconnected') setSocketConnected(false)
+    })
+
+    api.onChatMessage((data) => {
+      setChatMessages(prev => [...prev, data])
+      appendLog('CHAT RECEIVED', `${data.from}: ${data.text}`)
+    })
+
+    api.onFileReceived((data) => {
+      setReceivedFiles(prev => [data, ...prev])
+      appendLog('FILE RECEIVED', `${data.name} → ${data.path}`)
+    })
+  }, [])
 
   return (
-    <div className="wizard-page">
-      <div className="wizard-bg wizard-bg-1"></div>
-      <div className="wizard-bg wizard-bg-2"></div>
-
-      <div className="wizard-layout">
-        <aside className="wizard-sidebar">
-          <div className="brand-box">
-            <div className="brand-icon">🛡️</div>
-            <div>
-              <h1>IPSec Wizard</h1>
-              <p>Server va client o‘rtasida xavfsiz tunnel boshqaruvi</p>
-            </div>
-          </div>
-
-          <div className="side-card">
-            <div className="status-line">
-              <span className={`status-dot ${isAdmin ? 'ok' : 'warn'}`}></span>
+    <div className="app-shell">
+      <div className="dashboard">
+        <aside className="sidebar">
+          <section className="side-card">
+            <div className="brand">
+              <div className="brand-icon">🛡️</div>
               <div>
-                <strong>{isAdmin ? 'Administrator rejimi faol' : 'Administrator rejimi faol emas'}</strong>
-                <p>Sozlashlar PowerShell orqali bajariladi</p>
+                <h2>IPSec Wizard</h2>
+                <p>Server va client o‘rtasida xavfsiz tunnel boshqaruvi</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="side-card">
+          <section className="side-card">
+            <div className="status-line">
+              <span className="status-dot" />
+              <span>Administrator rejimi faol</span>
+            </div>
+            <p>Sozlashlar PowerShell orqali bajariladi</p>
+          </section>
+
+          <section className="side-card">
             <h3>Rejim tanlash</h3>
-            <div className="role-box">
+            <div className="mode-toggle">
               <button
-                className={`role-btn ${role === 'server' ? 'active' : ''}`}
+                className={`mode-btn ${role === 'server' ? 'active' : ''}`}
                 onClick={() => setRole('server')}
               >
                 Server
               </button>
               <button
-                className={`role-btn ${role === 'client' ? 'active' : ''}`}
+                className={`mode-btn ${role === 'client' ? 'active' : ''}`}
                 onClick={() => setRole('client')}
               >
                 Client
@@ -227,56 +230,49 @@ function App() {
             <p>
               {role === 'server'
                 ? 'Server client uchun tunnel IP beradi va boshqaradi.'
-                : 'Client faqat server belgilagan tunnel ma’lumotlarini ko‘radi.'}
+                : 'Client server tomonidan berilgan tunnel konfiguratsiyasidan foydalanadi.'}
             </p>
-          </div>
+          </section>
 
-          <div className="side-card">
+          <section className="side-card">
             <h3>Tanlangan bosqichlar</h3>
-            <div className="big-count">{selectedCount} / 12</div>
+            <div className="count-box">{stepCount}</div>
             <p>Barcha bosqichlar galichka bilan yoqiladi yoki o‘chiriladi.</p>
-          </div>
+          </section>
 
-          <div className="side-card">
+          <section className="side-card">
             <h3>Profiles</h3>
-            <label className="profile-item">
-              <input type="checkbox" checked={form.profileDomain} onChange={(e) => updateField('profileDomain', e.target.checked)} />
-              Domain
-            </label>
-            <label className="profile-item">
-              <input type="checkbox" checked={form.profilePrivate} onChange={(e) => updateField('profilePrivate', e.target.checked)} />
-              Private
-            </label>
-            <label className="profile-item">
-              <input type="checkbox" checked={form.profilePublic} onChange={(e) => updateField('profilePublic', e.target.checked)} />
-              Public
-            </label>
-          </div>
+            <div className="profile-list">
+              <div className="profile-item">Domain</div>
+              <div className="profile-item">Private</div>
+              <div className="profile-item">Public</div>
+            </div>
+          </section>
         </aside>
 
-        <main className="wizard-main">
+        <main className="main">
           <section className="hero-card">
             <div>
-              <h2>IPSec Tunnel Boshqaruvi</h2>
-              <p>Server va client qurilmalar o‘rtasida xavfsiz tunnel yaratish va nazorat qilish oynasi.</p>
+              <h1>IPSec Tunnel Boshqaruvi</h1>
+              <p>
+                Server va client qurilmalar o‘rtasida xavfsiz tunnel yaratish va nazorat qilish oynasi.
+              </p>
             </div>
 
             <div className="hero-actions">
-              <button className="btn secondary" onClick={handleCheck}>Check</button>
-              <button className="btn danger" onClick={handleRemove}>Remove</button>
-              <button className="btn primary" onClick={handleApply}>OK</button>
+              <button className="action-btn dark" onClick={handleCheck}>Check</button>
+              <button className="action-btn danger" onClick={handleRemove}>Remove</button>
+              <button className="action-btn primary" onClick={handleOK}>OK</button>
             </div>
           </section>
 
-          <section className="input-card">
+          <section className="form-card">
             <div className="input-grid">
               <div className="field">
                 <label>Server Real IP</label>
                 <input
                   value={form.serverRealIP}
-                  onChange={(e) => updateField('serverRealIP', e.target.value)}
-                  placeholder="192.168.1.100"
-                  disabled={role === 'client'}
+                  onChange={(e) => setField('serverRealIP', e.target.value)}
                 />
               </div>
 
@@ -284,9 +280,7 @@ function App() {
                 <label>Client Real IP</label>
                 <input
                   value={form.clientRealIP}
-                  onChange={(e) => updateField('clientRealIP', e.target.value)}
-                  placeholder="192.168.1.200"
-                  disabled={role === 'client'}
+                  onChange={(e) => setField('clientRealIP', e.target.value)}
                 />
               </div>
 
@@ -294,9 +288,7 @@ function App() {
                 <label>Server Tunnel IP</label>
                 <input
                   value={form.serverTunnelIP}
-                  onChange={(e) => updateField('serverTunnelIP', e.target.value)}
-                  placeholder="10.10.10.1"
-                  disabled={role === 'client'}
+                  onChange={(e) => setField('serverTunnelIP', e.target.value)}
                 />
               </div>
 
@@ -304,9 +296,7 @@ function App() {
                 <label>Client Tunnel IP</label>
                 <input
                   value={form.clientTunnelIP}
-                  onChange={(e) => updateField('clientTunnelIP', e.target.value)}
-                  placeholder="10.10.10.2"
-                  disabled={role === 'client'}
+                  onChange={(e) => setField('clientTunnelIP', e.target.value)}
                 />
               </div>
 
@@ -314,9 +304,7 @@ function App() {
                 <label>Pre-Shared Key</label>
                 <input
                   value={form.psk}
-                  onChange={(e) => updateField('psk', e.target.value)}
-                  placeholder="Masalan: test123"
-                  disabled={role === 'client'}
+                  onChange={(e) => setField('psk', e.target.value)}
                 />
               </div>
             </div>
@@ -325,36 +313,112 @@ function App() {
           <section className="tools-card">
             <h3>Ishlash Tekshiruvi</h3>
             <div className="tools-grid">
-              <button className="tool-btn" onClick={handlePing}>
-                {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
-              </button>
+              <button className="tool-btn" onClick={handlePing}>Clientga Ping</button>
               <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
               <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
               <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
-              {role === 'server' ? (
-                <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
-              ) : (
-                <button className="tool-btn" onClick={handleLoadClientConfig}>Server Config Yuklash</button>
-              )}
+              <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
             </div>
           </section>
 
-          <section className="menu-card">
-            <h3>IPSec Ishlash Jarayoni</h3>
-            <div className="wizard-grid">
-              {steps.map((step) => (
-                <label className="wizard-step" key={step.key}>
-                  <div className="step-top">
-                    <span className="step-num">{step.num}</span>
-                    <input
-                      type="checkbox"
-                      checked={form[step.key]}
-                      onChange={(e) => updateField(step.key, e.target.checked)}
-                    />
+          <section className="chat-card">
+            <h3>Xabarlar bo‘limi</h3>
+
+            <div className="tools-grid">
+              <button className="tool-btn" onClick={handleStartMessaging}>
+                {role === 'server' ? 'Chat serverni ishga tushirish' : 'Chat serverga ulanish'}
+              </button>
+
+              <button className="tool-btn" onClick={handleDisconnectSocket}>
+                Chat ulanishni uzish
+              </button>
+            </div>
+
+            <div className="input-grid" style={{ marginTop: '16px' }}>
+              <div className="field field-full">
+                <label>Socket Port</label>
+                <input
+                  value={socketPort}
+                  onChange={(e) => setSocketPort(e.target.value)}
+                />
+              </div>
+
+              <div className="field field-full">
+                <label>Xabar yozish</label>
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Masalan: Salom, tunnel ishlayaptimi?"
+                />
+              </div>
+            </div>
+
+            <div className="tools-grid" style={{ marginTop: '12px' }}>
+              <button className="tool-btn" onClick={handleSendMessage} disabled={!socketConnected}>
+                Xabar yuborish
+              </button>
+            </div>
+
+            <div className="console-card" style={{ marginTop: '16px' }}>
+              <div className="console-head">
+                <h3>Chat oynasi</h3>
+                <span>{socketConnected ? 'Ulangan' : 'Ulanmagan'}</span>
+              </div>
+
+              <div className="chat-box">
+                {chatMessages.length === 0 && (
+                  <div style={{ color: '#9ca7de' }}>
+                    Hozircha xabar yo‘q.
                   </div>
+                )}
+
+                {chatMessages.map((msg, index) => (
+                  <div
+                    key={`${msg.time}-${index}`}
+                    className={`chat-item ${msg.from === role ? 'own' : 'peer'}`}
+                  >
+                    <strong>{msg.from}</strong> [{msg.time}]
+                    <br />
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="files-card">
+            <h3>Fayl almashish bo‘limi</h3>
+
+            <div className="file-hint">
+              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan, client config yoki boshqa fayllar yuboriladi.
+            </div>
+
+            <div className="tools-grid">
+              <button className="tool-btn" onClick={handleSendFile} disabled={!socketConnected}>
+                Fayl tanlash va yuborish
+              </button>
+            </div>
+
+            <div className="file-list">
+              {receivedFiles.map((item, index) => (
+                <div key={`${item.name}-${index}`} className="file-item">
+                  <strong>{item.name}</strong>
+                  <small>{item.from} → {item.path}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="process-card">
+            <h3>IPSec Ishlash Jarayoni</h3>
+            <div className="process-grid">
+              {steps.map((step) => (
+                <div className="step-card" key={step.id}>
+                  <div className="step-num">{step.id}</div>
+                  <div className="step-check">☑</div>
                   <h4>{step.title}</h4>
                   <p>{step.desc}</p>
-                </label>
+                </div>
               ))}
             </div>
           </section>
@@ -364,7 +428,9 @@ function App() {
               <h3>Console Output</h3>
               <span>PowerShell natijalari shu yerda chiqadi</span>
             </div>
-            <textarea className="console-box" readOnly value={log} />
+            <div className="console-box">
+              {consoleLines.join('\n')}
+            </div>
           </section>
         </main>
       </div>

@@ -1,11 +1,11 @@
 {
   "role": "client",
-  "serverRealIP": "192.168.1.72",
-  "clientRealIP": "192.168.1.71",
+  "serverRealIP": "192.168.1.100",
+  "clientRealIP": "192.168.1.200",
   "serverTunnelIP": "10.10.10.1",
   "clientTunnelIP": "10.10.10.2",
   "psk": "IPsuperSECRET",
-  "profileDomain": true,
-  "profilePrivate": true,
-  "profilePublic": true
+  "profileDomain": false,
+  "profilePrivate": false,
+  "profilePublic": false
 }
