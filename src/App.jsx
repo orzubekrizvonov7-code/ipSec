@@ -22,6 +22,9 @@ const defaultForm = {
   serverTunnelIP: '10.10.10.1',
   clientTunnelIP: '10.10.10.2',
   psk: 'IPsuperSECRET',
+  profileDomain: true,
+  profilePrivate: true,
+  profilePublic: true,
 }
 
 function App() {
@@ -30,16 +33,10 @@ function App() {
   const [role, setRole] = useState('server')
   const [form, setForm] = useState(defaultForm)
   const [consoleLines, setConsoleLines] = useState([
-    'Dastur ishga tushdi.',
-    '',
-    '[01:39:23] CHECK ADMIN RESULT',
-    'Administrator rejimi faol.',
-    '',
-    '[01:39:23] CHECK ADMIN RESULT',
-    'Administrator rejimi faol.'
+    'Dastur ishga tushdi.'
   ])
 
-  const [socketPort, setSocketPort] = useState(9001)
+  const [socketPort, setSocketPort] = useState('9001')
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([])
   const [socketConnected, setSocketConnected] = useState(false)
@@ -64,7 +61,7 @@ function App() {
   async function handleCheckAdmin() {
     if (!api?.checkAdmin) return
     const res = await api.checkAdmin()
-    appendLog('CHECK ADMIN RESULT', res?.output || 'Natija yo‘q')
+    appendLog('CHECK ADMIN RESULT', res?.output || res?.error || 'Natija yo‘q')
   }
 
   async function handleCheck() {
@@ -81,10 +78,22 @@ function App() {
 
   async function handleOK() {
     if (!api?.applyIpsec) return
-    const res = await api.applyIpsec({
+
+    const payload = {
       role,
-      ...form
-    })
+      localIP: role === 'server' ? form.serverTunnelIP : form.clientTunnelIP,
+      remoteIP: role === 'server' ? form.clientTunnelIP : form.serverTunnelIP,
+      psk: form.psk,
+      profileDomain: form.profileDomain,
+      profilePrivate: form.profilePrivate,
+      profilePublic: form.profilePublic,
+      serverRealIP: form.serverRealIP,
+      clientRealIP: form.clientRealIP,
+      serverTunnelIP: form.serverTunnelIP,
+      clientTunnelIP: form.clientTunnelIP,
+    }
+
+    const res = await api.applyIpsec(payload)
     appendLog('OK / APPLY RESULT', res?.output || 'Natija yo‘q')
   }
 
@@ -115,11 +124,35 @@ function App() {
 
   async function handleSaveClientConfig() {
     if (!api?.saveServerPackage) return
-    const res = await api.saveServerPackage({
-      role,
-      ...form
-    })
+
+    const payload = {
+      role: 'client',
+      serverRealIP: form.serverRealIP,
+      clientRealIP: form.clientRealIP,
+      serverTunnelIP: form.serverTunnelIP,
+      clientTunnelIP: form.clientTunnelIP,
+      psk: form.psk,
+      profileDomain: form.profileDomain,
+      profilePrivate: form.profilePrivate,
+      profilePublic: form.profilePublic,
+    }
+
+    const res = await api.saveServerPackage(payload)
     appendLog('CLIENT CONFIG SAVE', res?.output || 'Natija yo‘q')
+  }
+
+  async function handleLoadClientConfig() {
+    if (!api?.loadClientPackage) return
+
+    const res = await api.loadClientPackage()
+    appendLog('CLIENT CONFIG LOAD', res?.output || 'Natija yo‘q')
+
+    if (res?.ok && res?.config) {
+      setForm(prev => ({
+        ...prev,
+        ...res.config
+      }))
+    }
   }
 
   async function handleStartMessaging() {
@@ -129,7 +162,8 @@ function App() {
       const res = await api.startSocketServer(socketPort)
       appendLog('SOCKET SERVER', res?.output || 'Natija yo‘q')
     } else {
-      const res = await api.connectSocketClient(form.serverTunnelIP, socketPort)
+      const host = form.serverTunnelIP?.trim() || '10.10.10.1'
+      const res = await api.connectSocketClient(host, socketPort)
       appendLog('SOCKET CLIENT', res?.output || 'Natija yo‘q')
     }
   }
@@ -174,6 +208,7 @@ function App() {
 
     api.onSocketStatus((data) => {
       appendLog('SOCKET STATUS', data.message)
+
       if (data.type === 'connected') setSocketConnected(true)
       if (data.type === 'disconnected') setSocketConnected(false)
     })
@@ -227,6 +262,7 @@ function App() {
                 Client
               </button>
             </div>
+
             <p>
               {role === 'server'
                 ? 'Server client uchun tunnel IP beradi va boshqaradi.'
@@ -313,11 +349,23 @@ function App() {
           <section className="tools-card">
             <h3>Ishlash Tekshiruvi</h3>
             <div className="tools-grid">
-              <button className="tool-btn" onClick={handlePing}>Clientga Ping</button>
+              <button className="tool-btn" onClick={handlePing}>
+                {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
+              </button>
+
               <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
               <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
               <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
-              <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
+
+              {role === 'server' ? (
+                <button className="tool-btn" onClick={handleSaveClientConfig}>
+                  Client Config Saqlash
+                </button>
+              ) : (
+                <button className="tool-btn" onClick={handleLoadClientConfig}>
+                  Client Config Yuklash
+                </button>
+              )}
             </div>
           </section>
 
@@ -326,7 +374,7 @@ function App() {
 
             <div className="tools-grid">
               <button className="tool-btn" onClick={handleStartMessaging}>
-                {role === 'server' ? 'Chat serverni ishga tushirish' : 'Chat serverga ulanish'}
+                {role === 'server' ? 'Chat serverga ulanishlarni kutish' : 'Chat serverga ulanish'}
               </button>
 
               <button className="tool-btn" onClick={handleDisconnectSocket}>
@@ -354,7 +402,11 @@ function App() {
             </div>
 
             <div className="tools-grid" style={{ marginTop: '12px' }}>
-              <button className="tool-btn" onClick={handleSendMessage} disabled={!socketConnected}>
+              <button
+                className="tool-btn"
+                onClick={handleSendMessage}
+                disabled={!socketConnected}
+              >
                 Xabar yuborish
               </button>
             </div>
@@ -367,9 +419,7 @@ function App() {
 
               <div className="chat-box">
                 {chatMessages.length === 0 && (
-                  <div style={{ color: '#9ca7de' }}>
-                    Hozircha xabar yo‘q.
-                  </div>
+                  <div style={{ color: '#9ca7de' }}>Hozircha xabar yo‘q.</div>
                 )}
 
                 {chatMessages.map((msg, index) => (
@@ -390,11 +440,16 @@ function App() {
             <h3>Fayl almashish bo‘limi</h3>
 
             <div className="file-hint">
-              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan, client config yoki boshqa fayllar yuboriladi.
+              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan,
+              client config yoki boshqa fayllar yuboriladi.
             </div>
 
             <div className="tools-grid">
-              <button className="tool-btn" onClick={handleSendFile} disabled={!socketConnected}>
+              <button
+                className="tool-btn"
+                onClick={handleSendFile}
+                disabled={!socketConnected}
+              >
                 Fayl tanlash va yuborish
               </button>
             </div>
@@ -428,9 +483,7 @@ function App() {
               <h3>Console Output</h3>
               <span>PowerShell natijalari shu yerda chiqadi</span>
             </div>
-            <div className="console-box">
-              {consoleLines.join('\n')}
-            </div>
+            <div className="console-box">{consoleLines.join('\n')}</div>
           </section>
         </main>
       </div>
