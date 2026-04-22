@@ -17,8 +17,8 @@ const steps = [
 ]
 
 const defaultForm = {
-  serverRealIP: '192.168.1.100',
-  clientRealIP: '192.168.1.200',
+  serverRealIP: '192.168.1.72',
+  clientRealIP: '192.168.1.84',
   serverTunnelIP: '10.10.10.1',
   clientTunnelIP: '10.10.10.2',
   psk: 'IPsuperSECRET',
@@ -32,9 +32,7 @@ function App() {
 
   const [role, setRole] = useState('server')
   const [form, setForm] = useState(defaultForm)
-  const [consoleLines, setConsoleLines] = useState([
-    'Dastur ishga tushdi.'
-  ])
+  const [consoleLines, setConsoleLines] = useState(['Dastur ishga tushdi.'])
 
   const [socketPort, setSocketPort] = useState('9001')
   const [chatInput, setChatInput] = useState('')
@@ -46,12 +44,7 @@ function App() {
 
   function appendLog(title, text) {
     const stamp = new Date().toLocaleTimeString()
-    setConsoleLines(prev => [
-      ...prev,
-      '',
-      `[${stamp}] ${title}`,
-      text || 'Natija yo‘q'
-    ])
+    setConsoleLines(prev => [...prev, '', `[${stamp}] ${title}`, text || 'Natija yo‘q'])
   }
 
   function setField(name, value) {
@@ -65,24 +58,20 @@ function App() {
   }
 
   async function handleCheck() {
-    if (!api?.checkIpsec) return
     const res = await api.checkIpsec()
     appendLog('CHECK RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleRemove() {
-    if (!api?.removeIpsec) return
     const res = await api.removeIpsec()
     appendLog('REMOVE RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleOK() {
-    if (!api?.applyIpsec) return
-
     const payload = {
       role,
-      localIP: role === 'server' ? form.serverTunnelIP : form.clientTunnelIP,
-      remoteIP: role === 'server' ? form.clientTunnelIP : form.serverTunnelIP,
+      localIP: role === 'server' ? form.serverRealIP : form.clientRealIP,
+      remoteIP: role === 'server' ? form.clientRealIP : form.serverRealIP,
       psk: form.psk,
       profileDomain: form.profileDomain,
       profilePrivate: form.profilePrivate,
@@ -98,33 +87,33 @@ function App() {
   }
 
   async function handlePing() {
-    if (!api?.runPing) return
-    const target = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
+    const target = role === 'server' ? form.clientRealIP : form.serverRealIP
     const res = await api.runPing(target)
     appendLog('PING RESULT', res?.output || 'Natija yo‘q')
   }
 
+  async function handleTunnelPing() {
+    const target = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
+    const res = await api.runPing(target)
+    appendLog('TUNNEL PING RESULT', res?.output || 'Natija yo‘q')
+  }
+
   async function handleIPConfig() {
-    if (!api?.checkIPConfig) return
     const res = await api.checkIPConfig()
     appendLog('IPCONFIG RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleGateway() {
-    if (!api?.checkGateway) return
     const res = await api.checkGateway()
     appendLog('GATEWAY RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleTunnel() {
-    if (!api?.checkTunnel) return
     const res = await api.checkTunnel()
     appendLog('TUNNEL RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleSaveClientConfig() {
-    if (!api?.saveServerPackage) return
-
     const payload = {
       role: 'client',
       serverRealIP: form.serverRealIP,
@@ -142,41 +131,36 @@ function App() {
   }
 
   async function handleLoadClientConfig() {
-    if (!api?.loadClientPackage) return
-
     const res = await api.loadClientPackage()
     appendLog('CLIENT CONFIG LOAD', res?.output || 'Natija yo‘q')
 
     if (res?.ok && res?.config) {
-      setForm(prev => ({
-        ...prev,
-        ...res.config
-      }))
+      setForm(prev => ({ ...prev, ...res.config }))
     }
   }
 
   async function handleStartMessaging() {
-    if (!api) return
-
     if (role === 'server') {
       const res = await api.startSocketServer(socketPort)
       appendLog('SOCKET SERVER', res?.output || 'Natija yo‘q')
     } else {
-      const host = form.serverTunnelIP?.trim() || '10.10.10.1'
+      const host = form.serverRealIP?.trim() || '192.168.1.72'
       const res = await api.connectSocketClient(host, socketPort)
       appendLog('SOCKET CLIENT', res?.output || 'Natija yo‘q')
     }
   }
 
   async function handleDisconnectSocket() {
-    if (!api?.disconnectSocket) return
     const res = await api.disconnectSocket()
     appendLog('SOCKET DISCONNECT', res?.output || 'Natija yo‘q')
     setSocketConnected(false)
   }
 
   async function handleSendMessage() {
-    if (!api?.sendChatMessage || !chatInput.trim()) return
+    if (!chatInput.trim()) {
+      appendLog('CHAT SEND', 'Xabar matni bo‘sh.')
+      return
+    }
 
     const payload = {
       from: role,
@@ -194,7 +178,6 @@ function App() {
   }
 
   async function handleSendFile() {
-    if (!api?.sendFileToPeer) return
     const res = await api.sendFileToPeer(role)
     appendLog('FILE SEND', res?.output || 'Natija yo‘q')
   }
@@ -249,20 +232,13 @@ function App() {
           <section className="side-card">
             <h3>Rejim tanlash</h3>
             <div className="mode-toggle">
-              <button
-                className={`mode-btn ${role === 'server' ? 'active' : ''}`}
-                onClick={() => setRole('server')}
-              >
+              <button className={`mode-btn ${role === 'server' ? 'active' : ''}`} onClick={() => setRole('server')}>
                 Server
               </button>
-              <button
-                className={`mode-btn ${role === 'client' ? 'active' : ''}`}
-                onClick={() => setRole('client')}
-              >
+              <button className={`mode-btn ${role === 'client' ? 'active' : ''}`} onClick={() => setRole('client')}>
                 Client
               </button>
             </div>
-
             <p>
               {role === 'server'
                 ? 'Server client uchun tunnel IP beradi va boshqaradi.'
@@ -290,9 +266,7 @@ function App() {
           <section className="hero-card">
             <div>
               <h1>IPSec Tunnel Boshqaruvi</h1>
-              <p>
-                Server va client qurilmalar o‘rtasida xavfsiz tunnel yaratish va nazorat qilish oynasi.
-              </p>
+              <p>Server va client qurilmalar o‘rtasida xavfsiz tunnel yaratish va nazorat qilish oynasi.</p>
             </div>
 
             <div className="hero-actions">
@@ -306,42 +280,27 @@ function App() {
             <div className="input-grid">
               <div className="field">
                 <label>Server Real IP</label>
-                <input
-                  value={form.serverRealIP}
-                  onChange={(e) => setField('serverRealIP', e.target.value)}
-                />
+                <input value={form.serverRealIP} onChange={(e) => setField('serverRealIP', e.target.value)} />
               </div>
 
               <div className="field">
                 <label>Client Real IP</label>
-                <input
-                  value={form.clientRealIP}
-                  onChange={(e) => setField('clientRealIP', e.target.value)}
-                />
+                <input value={form.clientRealIP} onChange={(e) => setField('clientRealIP', e.target.value)} />
               </div>
 
               <div className="field">
                 <label>Server Tunnel IP</label>
-                <input
-                  value={form.serverTunnelIP}
-                  onChange={(e) => setField('serverTunnelIP', e.target.value)}
-                />
+                <input value={form.serverTunnelIP} onChange={(e) => setField('serverTunnelIP', e.target.value)} />
               </div>
 
               <div className="field">
                 <label>Client Tunnel IP</label>
-                <input
-                  value={form.clientTunnelIP}
-                  onChange={(e) => setField('clientTunnelIP', e.target.value)}
-                />
+                <input value={form.clientTunnelIP} onChange={(e) => setField('clientTunnelIP', e.target.value)} />
               </div>
 
               <div className="field field-full">
                 <label>Pre-Shared Key</label>
-                <input
-                  value={form.psk}
-                  onChange={(e) => setField('psk', e.target.value)}
-                />
+                <input value={form.psk} onChange={(e) => setField('psk', e.target.value)} />
               </div>
             </div>
           </section>
@@ -353,10 +312,16 @@ function App() {
                 {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
               </button>
 
+              <button className="tool-btn" onClick={handleTunnelPing}>
+                Tunnelga Ping
+              </button>
+
               <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
               <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
               <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
+            </div>
 
+            <div className="tools-grid" style={{ marginTop: '10px' }}>
               {role === 'server' ? (
                 <button className="tool-btn" onClick={handleSaveClientConfig}>
                   Client Config Saqlash
@@ -374,7 +339,7 @@ function App() {
 
             <div className="tools-grid">
               <button className="tool-btn" onClick={handleStartMessaging}>
-                {role === 'server' ? 'Chat serverga ulanishlarni kutish' : 'Chat serverga ulanish'}
+                {role === 'server' ? 'Chat serverni ishga tushirish' : 'Chat serverga ulanish'}
               </button>
 
               <button className="tool-btn" onClick={handleDisconnectSocket}>
@@ -385,10 +350,7 @@ function App() {
             <div className="input-grid" style={{ marginTop: '16px' }}>
               <div className="field field-full">
                 <label>Socket Port</label>
-                <input
-                  value={socketPort}
-                  onChange={(e) => setSocketPort(e.target.value)}
-                />
+                <input value={socketPort} onChange={(e) => setSocketPort(e.target.value)} />
               </div>
 
               <div className="field field-full">
@@ -402,11 +364,7 @@ function App() {
             </div>
 
             <div className="tools-grid" style={{ marginTop: '12px' }}>
-              <button
-                className="tool-btn"
-                onClick={handleSendMessage}
-                disabled={!socketConnected}
-              >
+              <button className="tool-btn" onClick={handleSendMessage} disabled={!socketConnected}>
                 Xabar yuborish
               </button>
             </div>
@@ -440,16 +398,11 @@ function App() {
             <h3>Fayl almashish bo‘limi</h3>
 
             <div className="file-hint">
-              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan,
-              client config yoki boshqa fayllar yuboriladi.
+              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan, client config yoki boshqa fayllar yuboriladi.
             </div>
 
             <div className="tools-grid">
-              <button
-                className="tool-btn"
-                onClick={handleSendFile}
-                disabled={!socketConnected}
-              >
+              <button className="tool-btn" onClick={handleSendFile} disabled={!socketConnected}>
                 Fayl tanlash va yuborish
               </button>
             </div>

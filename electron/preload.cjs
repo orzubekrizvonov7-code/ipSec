@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('ipsecAPI', {
   checkAdmin: () => ipcRenderer.invoke('check-admin'),
@@ -9,9 +9,6 @@ contextBridge.exposeInMainWorld('ipsecAPI', {
 
   saveServerPackage: (config) => ipcRenderer.invoke('save-server-package', config),
   loadClientPackage: () => ipcRenderer.invoke('load-client-package'),
-  startVpn: (config) => ipcRenderer.invoke('start-vpn', config),
-  stopVpn: (config) => ipcRenderer.invoke('stop-vpn', config),
-  checkVpn: () => ipcRenderer.invoke('check-vpn'),
 
   runPing: (ip) => ipcRenderer.invoke('run-ping', ip),
   checkIPConfig: () => ipcRenderer.invoke('check-ipconfig'),
@@ -27,4 +24,4 @@ contextBridge.exposeInMainWorld('ipsecAPI', {
   onSocketStatus: (callback) => ipcRenderer.on('socket-status', (_e, data) => callback(data)),
   onChatMessage: (callback) => ipcRenderer.on('chat-message', (_e, data) => callback(data)),
   onFileReceived: (callback) => ipcRenderer.on('file-received', (_e, data) => callback(data)),
-})
+});
