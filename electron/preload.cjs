@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('ipsecAPI', {
 
   startSocketServer: (port) => ipcRenderer.invoke('start-socket-server', port),
   connectSocketClient: (host, port) => ipcRenderer.invoke('connect-socket-client', host, port),
-  sendChatMessage: (message) => ipcRenderer.invoke('send-chat-message', message),
+  sendChatMessage: (payload) => ipcRenderer.invoke('send-chat-message', payload),
   sendFileToPeer: (role) => ipcRenderer.invoke('send-file-to-peer', role),
   disconnectSocket: () => ipcRenderer.invoke('disconnect-socket'),
 

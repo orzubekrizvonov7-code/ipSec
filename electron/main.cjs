@@ -91,8 +91,8 @@ function buildProfileString(config) {
 }
 
 function buildApplyScript(config) {
-  const localIP = escPsSingle(config.localIP || config.serverTunnelIP || '');
-  const remoteIP = escPsSingle(config.remoteIP || config.clientTunnelIP || '');
+  const localIP = escPsSingle(config.localIP || '');
+  const remoteIP = escPsSingle(config.remoteIP || '');
   const psk = escPsSingle(config.psk || '');
   const profileValue = escPsSingle(buildProfileString(config));
 
@@ -145,8 +145,6 @@ function buildApplyScript(config) {
   lines.push(`Write-Output ''`);
   lines.push(`Write-Output '=== IPSec Rule ==='`);
   lines.push(`Get-NetIPsecRule -DisplayName $ruleName | Select-Object DisplayName, Enabled, LocalAddress, RemoteAddress, Profile, KeyModule, Phase1AuthSet, QuickModeCryptoSet | Format-List | Out-String`);
-  lines.push(`Write-Output '=== Firewall Rule ==='`);
-  lines.push(`Get-NetFirewallRule -DisplayName $fwName -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled, Direction, Profile, Action | Format-List | Out-String`);
 
   return lines.join('\n');
 }
@@ -180,7 +178,7 @@ Remove-NetIPsecRule -DisplayName $ruleName -ErrorAction SilentlyContinue
 Remove-NetIPsecPhase1AuthSet -DisplayName $authName -ErrorAction SilentlyContinue
 Remove-NetIPsecQuickModeCryptoSet -DisplayName $qmName -ErrorAction SilentlyContinue
 
-Write-Output 'IPSec qoida, firewall qoida va yordamchi setlar o‘chirildi.'
+Write-Output 'IPSec qoida va firewall qoidalari o‘chirildi.'
 `;
 }
 
@@ -188,31 +186,23 @@ function buildAdminCheckScript() {
   return `
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  Write-Output 'ADMIN'
+  Write-Output 'Administrator rejimi faol.'
 } else {
-  Write-Output 'NOT_ADMIN'
+  Write-Output 'Administrator rejimi faol emas.'
 }
 `;
 }
 
 ipcMain.handle('check-admin', async () => {
   try {
-    const result = await runPowerShell(buildAdminCheckScript());
-    return {
-      ok: true,
-      isAdmin: result.output.includes('ADMIN'),
-      output: result.output.includes('ADMIN') ? 'Administrator rejimi faol.' : 'Administrator rejimi faol emas.'
-    };
+    return await runPowerShell(buildAdminCheckScript());
   } catch (err) {
-    return { ok: false, error: err.message, output: err.message };
+    return { ok: false, output: err.message };
   }
 });
 
 ipcMain.handle('apply-ipsec', async (_event, config) => {
   try {
-    if (config.role === 'client' && !config.serverTunnelIP) {
-      return { ok: false, output: 'Client uchun server config yuklanmagan.' };
-    }
     return await runPowerShell(buildApplyScript(config));
   } catch (err) {
     return { ok: false, output: err.message };
@@ -237,9 +227,7 @@ ipcMain.handle('remove-ipsec', async () => {
 
 ipcMain.handle('run-ping', async (_event, ip) => {
   const safeIp = String(ip || '').trim();
-  if (!safeIp) {
-    return { ok: false, output: 'Ping uchun IP kiritilmagan.' };
-  }
+  if (!safeIp) return { ok: false, output: 'Ping uchun IP kiritilmagan.' };
   return await execCommand(`ping ${safeIp}`);
 });
 
@@ -268,18 +256,6 @@ Get-NetIPsecQuickModeSA | Format-Table -AutoSize | Out-String
 
 ipcMain.handle('save-server-package', async (_event, config) => {
   try {
-    const data = {
-      role: 'client',
-      serverRealIP: config.serverRealIP,
-      clientRealIP: config.clientRealIP,
-      serverTunnelIP: config.serverTunnelIP,
-      clientTunnelIP: config.clientTunnelIP,
-      psk: config.psk,
-      profileDomain: !!config.profileDomain,
-      profilePrivate: !!config.profilePrivate,
-      profilePublic: !!config.profilePublic
-    };
-
     const result = await dialog.showSaveDialog({
       title: 'Client konfiguratsiyasini saqlash',
       defaultPath: 'ipsec-client-config.json',
@@ -290,7 +266,7 @@ ipcMain.handle('save-server-package', async (_event, config) => {
       return { ok: false, output: 'Saqlash bekor qilindi.' };
     }
 
-    fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf8');
     return { ok: true, output: `Config saqlandi:\n${result.filePath}` };
   } catch (err) {
     return { ok: false, output: err.message };
@@ -321,18 +297,6 @@ ipcMain.handle('load-client-package', async () => {
   } catch (err) {
     return { ok: false, output: err.message };
   }
-});
-
-ipcMain.handle('start-vpn', async (_event, config) => {
-  return { ok: true, output: `VPN ishga tushirish tayyor.\nServer tunnel: ${config.serverTunnelIP}\nClient tunnel: ${config.clientTunnelIP}` };
-});
-
-ipcMain.handle('stop-vpn', async () => {
-  return { ok: true, output: 'VPN to‘xtatish komandasi bajarildi.' };
-});
-
-ipcMain.handle('check-vpn', async () => {
-  return await execCommand(`"C:\\Program Files\\WireGuard\\wg.exe" show`);
 });
 
 registerRealtimeHandlers();

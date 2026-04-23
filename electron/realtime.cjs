@@ -7,17 +7,16 @@ let socketServer = null;
 let socketClient = null;
 let connectedPeer = null;
 
-function cleanupSockets() {
-  if (socketClient) {
-    try { socketClient.close(); } catch {}
-    socketClient = null;
-  }
+function resetSockets() {
+  try {
+    if (socketClient) socketClient.close();
+  } catch {}
+  try {
+    if (socketServer) socketServer.close();
+  } catch {}
 
-  if (socketServer) {
-    try { socketServer.close(); } catch {}
-    socketServer = null;
-  }
-
+  socketClient = null;
+  socketServer = null;
   connectedPeer = null;
 }
 
@@ -28,7 +27,10 @@ function registerRealtimeHandlers() {
         return { ok: true, output: `Socket server allaqachon ishga tushgan: ${port}` };
       }
 
-      socketServer = new WebSocket.Server({ host: '0.0.0.0', port: Number(port) });
+      socketServer = new WebSocket.Server({
+        host: '0.0.0.0',
+        port: Number(port)
+      });
 
       socketServer.on('connection', (ws, req) => {
         connectedPeer = ws;
@@ -53,7 +55,7 @@ function registerRealtimeHandlers() {
             } catch (err) {
               event.sender.send('socket-status', {
                 type: 'error',
-                message: `JSON parse xato: ${err.message}`
+                message: `Xabar parse xatosi: ${err.message}`
               });
             }
           } else {
@@ -61,7 +63,9 @@ function registerRealtimeHandlers() {
             if (!meta) return;
 
             const saveDir = path.join(app.getPath('downloads'), 'IPSecWizard_Received');
-            if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
+            if (!fs.existsSync(saveDir)) {
+              fs.mkdirSync(saveDir, { recursive: true });
+            }
 
             const savePath = path.join(saveDir, meta.name);
             fs.writeFileSync(savePath, data);
@@ -88,7 +92,7 @@ function registerRealtimeHandlers() {
         ws.on('error', (err) => {
           event.sender.send('socket-status', {
             type: 'error',
-            message: `Server socket xato: ${err.message}`
+            message: `Server socket xatosi: ${err.message}`
           });
         });
       });
@@ -134,7 +138,7 @@ function registerRealtimeHandlers() {
           } catch (err) {
             event.sender.send('socket-status', {
               type: 'error',
-              message: `JSON parse xato: ${err.message}`
+              message: `Xabar parse xatosi: ${err.message}`
             });
           }
         } else {
@@ -142,7 +146,9 @@ function registerRealtimeHandlers() {
           if (!meta) return;
 
           const saveDir = path.join(app.getPath('downloads'), 'IPSecWizard_Received');
-          if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
+          if (!fs.existsSync(saveDir)) {
+            fs.mkdirSync(saveDir, { recursive: true });
+          }
 
           const savePath = path.join(saveDir, meta.name);
           fs.writeFileSync(savePath, data);
@@ -169,7 +175,7 @@ function registerRealtimeHandlers() {
       socketClient.on('error', (err) => {
         event.sender.send('socket-status', {
           type: 'error',
-          message: `Client socket xato: ${err.message}`
+          message: `Client socket xatosi: ${err.message}`
         });
       });
 
@@ -182,7 +188,7 @@ function registerRealtimeHandlers() {
   ipcMain.handle('send-chat-message', async (_event, payload) => {
     try {
       if (!connectedPeer || connectedPeer.readyState !== WebSocket.OPEN) {
-        return { ok: false, output: 'Peer ulanmagan.' };
+        return { ok: false, output: 'Socket ulanmagan.' };
       }
 
       connectedPeer.send(JSON.stringify({
@@ -201,7 +207,7 @@ function registerRealtimeHandlers() {
   ipcMain.handle('send-file-to-peer', async (event, role) => {
     try {
       if (!connectedPeer || connectedPeer.readyState !== WebSocket.OPEN) {
-        return { ok: false, output: 'Peer ulanmagan.' };
+        return { ok: false, output: 'Socket ulanmagan.' };
       }
 
       const result = await dialog.showOpenDialog({
@@ -228,7 +234,7 @@ function registerRealtimeHandlers() {
 
       event.sender.send('socket-status', {
         type: 'file-sent',
-        message: `Fayl yuborildi: ${name} (${fileBuffer.length} bayt)`
+        message: `Fayl yuborildi: ${name}`
       });
 
       return { ok: true, output: `Fayl yuborildi: ${name}` };
@@ -238,7 +244,7 @@ function registerRealtimeHandlers() {
   });
 
   ipcMain.handle('disconnect-socket', async () => {
-    cleanupSockets();
+    resetSockets();
     return { ok: true, output: 'Socket aloqa yopildi.' };
   });
 }

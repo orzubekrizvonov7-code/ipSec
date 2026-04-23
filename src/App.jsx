@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-const steps = [
+const stepsSeed = [
   { id: 1, title: 'Connection Security Rules', desc: 'Firewall oynasida IPSec qoida yaratish oynasi ochiladi.' },
   { id: 2, title: 'Custom Rule', desc: 'Custom turdagi xavfsizlik qoidasi tanlanadi.' },
   { id: 3, title: 'Endpoint 1', desc: 'Local qurilmaning tunnel manzili ishlatiladi.' },
@@ -33,14 +33,17 @@ function App() {
   const [role, setRole] = useState('server')
   const [form, setForm] = useState(defaultForm)
   const [consoleLines, setConsoleLines] = useState(['Dastur ishga tushdi.'])
-
   const [socketPort, setSocketPort] = useState('9001')
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([])
   const [socketConnected, setSocketConnected] = useState(false)
   const [receivedFiles, setReceivedFiles] = useState([])
+  const [steps, setSteps] = useState(stepsSeed.map(s => ({ ...s, active: true })))
 
-  const stepCount = useMemo(() => `${steps.length} / ${steps.length}`, [])
+  const stepCount = useMemo(() => {
+    const onCount = steps.filter(s => s.active).length
+    return `${onCount} / ${steps.length}`
+  }, [steps])
 
   function appendLog(title, text) {
     const stamp = new Date().toLocaleTimeString()
@@ -51,10 +54,15 @@ function App() {
     setForm(prev => ({ ...prev, [name]: value }))
   }
 
+  function toggleStep(id) {
+    setSteps(prev => prev.map(step => (
+      step.id === id ? { ...step, active: !step.active } : step
+    )))
+  }
+
   async function handleCheckAdmin() {
-    if (!api?.checkAdmin) return
     const res = await api.checkAdmin()
-    appendLog('CHECK ADMIN RESULT', res?.output || res?.error || 'Natija yo‘q')
+    appendLog('CHECK ADMIN RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleCheck() {
@@ -70,16 +78,12 @@ function App() {
   async function handleOK() {
     const payload = {
       role,
-      localIP: role === 'server' ? form.serverRealIP : form.clientRealIP,
-      remoteIP: role === 'server' ? form.clientRealIP : form.serverRealIP,
+      localIP: role === 'server' ? form.serverTunnelIP : form.clientTunnelIP,
+      remoteIP: role === 'server' ? form.clientTunnelIP : form.serverTunnelIP,
       psk: form.psk,
       profileDomain: form.profileDomain,
       profilePrivate: form.profilePrivate,
       profilePublic: form.profilePublic,
-      serverRealIP: form.serverRealIP,
-      clientRealIP: form.clientRealIP,
-      serverTunnelIP: form.serverTunnelIP,
-      clientTunnelIP: form.clientTunnelIP,
     }
 
     const res = await api.applyIpsec(payload)
@@ -87,15 +91,9 @@ function App() {
   }
 
   async function handlePing() {
-    const target = role === 'server' ? form.clientRealIP : form.serverRealIP
-    const res = await api.runPing(target)
-    appendLog('PING RESULT', res?.output || 'Natija yo‘q')
-  }
-
-  async function handleTunnelPing() {
     const target = role === 'server' ? form.clientTunnelIP : form.serverTunnelIP
     const res = await api.runPing(target)
-    appendLog('TUNNEL PING RESULT', res?.output || 'Natija yo‘q')
+    appendLog('PING RESULT', res?.output || 'Natija yo‘q')
   }
 
   async function handleIPConfig() {
@@ -115,7 +113,6 @@ function App() {
 
   async function handleSaveClientConfig() {
     const payload = {
-      role: 'client',
       serverRealIP: form.serverRealIP,
       clientRealIP: form.clientRealIP,
       serverTunnelIP: form.serverTunnelIP,
@@ -144,7 +141,7 @@ function App() {
       const res = await api.startSocketServer(socketPort)
       appendLog('SOCKET SERVER', res?.output || 'Natija yo‘q')
     } else {
-      const host = form.serverRealIP?.trim() || '192.168.1.72'
+      const host = form.serverRealIP?.trim()
       const res = await api.connectSocketClient(host, socketPort)
       appendLog('SOCKET CLIENT', res?.output || 'Natija yo‘q')
     }
@@ -157,8 +154,13 @@ function App() {
   }
 
   async function handleSendMessage() {
+    if (!socketConnected) {
+      appendLog('CHAT SEND', 'Avval ulanishni o‘rnating.')
+      return
+    }
+
     if (!chatInput.trim()) {
-      appendLog('CHAT SEND', 'Xabar matni bo‘sh.')
+      appendLog('CHAT SEND', 'Xabar bo‘sh.')
       return
     }
 
@@ -178,6 +180,11 @@ function App() {
   }
 
   async function handleSendFile() {
+    if (!socketConnected) {
+      appendLog('FILE SEND', 'Avval ulanishni o‘rnating.')
+      return
+    }
+
     const res = await api.sendFileToPeer(role)
     appendLog('FILE SEND', res?.output || 'Natija yo‘q')
   }
@@ -187,11 +194,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!api) return
-
     api.onSocketStatus((data) => {
       appendLog('SOCKET STATUS', data.message)
-
       if (data.type === 'connected') setSocketConnected(true)
       if (data.type === 'disconnected') setSocketConnected(false)
     })
@@ -311,25 +315,13 @@ function App() {
               <button className="tool-btn" onClick={handlePing}>
                 {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
               </button>
-
-              <button className="tool-btn" onClick={handleTunnelPing}>
-                Tunnelga Ping
-              </button>
-
               <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
               <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
               <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
-            </div>
-
-            <div className="tools-grid" style={{ marginTop: '10px' }}>
               {role === 'server' ? (
-                <button className="tool-btn" onClick={handleSaveClientConfig}>
-                  Client Config Saqlash
-                </button>
+                <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
               ) : (
-                <button className="tool-btn" onClick={handleLoadClientConfig}>
-                  Client Config Yuklash
-                </button>
+                <button className="tool-btn" onClick={handleLoadClientConfig}>Client Config Yuklash</button>
               )}
             </div>
           </section>
@@ -341,10 +333,7 @@ function App() {
               <button className="tool-btn" onClick={handleStartMessaging}>
                 {role === 'server' ? 'Chat serverni ishga tushirish' : 'Chat serverga ulanish'}
               </button>
-
-              <button className="tool-btn" onClick={handleDisconnectSocket}>
-                Chat ulanishni uzish
-              </button>
+              <button className="tool-btn" onClick={handleDisconnectSocket}>Chat ulanishni uzish</button>
             </div>
 
             <div className="input-grid" style={{ marginTop: '16px' }}>
@@ -358,7 +347,7 @@ function App() {
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Masalan: Salom, tunnel ishlayaptimi?"
+                  placeholder="Masalan: salom"
                 />
               </div>
             </div>
@@ -396,9 +385,8 @@ function App() {
 
           <section className="files-card">
             <h3>Fayl almashish bo‘limi</h3>
-
             <div className="file-hint">
-              Ushbu bo‘lim orqali tunnel ichidan fayl yuborish mumkin. Masalan, client config yoki boshqa fayllar yuboriladi.
+              Ulanish o‘rnatilgandan keyin xohlagan faylni yuborish mumkin.
             </div>
 
             <div className="tools-grid">
@@ -421,9 +409,13 @@ function App() {
             <h3>IPSec Ishlash Jarayoni</h3>
             <div className="process-grid">
               {steps.map((step) => (
-                <div className="step-card" key={step.id}>
+                <div
+                  key={step.id}
+                  className={`step-card ${step.active ? 'active' : ''}`}
+                  onClick={() => toggleStep(step.id)}
+                >
                   <div className="step-num">{step.id}</div>
-                  <div className="step-check">☑</div>
+                  <div className="step-check">{step.active ? '☑' : '☐'}</div>
                   <h4>{step.title}</h4>
                   <p>{step.desc}</p>
                 </div>
