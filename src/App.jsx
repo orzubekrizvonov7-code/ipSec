@@ -237,10 +237,10 @@ function App() {
             <h3>Rejim tanlash</h3>
             <div className="mode-toggle">
               <button className={`mode-btn ${role === 'server' ? 'active' : ''}`} onClick={() => setRole('server')}>
-                Server
+                🖥️ Server
               </button>
               <button className={`mode-btn ${role === 'client' ? 'active' : ''}`} onClick={() => setRole('client')}>
-                Client
+                💻 Client
               </button>
             </div>
             <p>
@@ -274,9 +274,9 @@ function App() {
             </div>
 
             <div className="hero-actions">
-              <button className="action-btn dark" onClick={handleCheck}>Check</button>
-              <button className="action-btn danger" onClick={handleRemove}>Remove</button>
-              <button className="action-btn primary" onClick={handleOK}>OK</button>
+              <button className="action-btn dark" onClick={handleCheck}>🔎 Check</button>
+              <button className="action-btn danger" onClick={handleRemove}>🗑️ Remove</button>
+              <button className="action-btn primary" onClick={handleOK}>✅ OK</button>
             </div>
           </section>
 
@@ -313,15 +313,15 @@ function App() {
             <h3>Ishlash Tekshiruvi</h3>
             <div className="tools-grid">
               <button className="tool-btn" onClick={handlePing}>
-                {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
+                📡 {role === 'server' ? 'Clientga Ping' : 'Serverga Ping'}
               </button>
-              <button className="tool-btn" onClick={handleIPConfig}>Check IPConfig</button>
-              <button className="tool-btn" onClick={handleGateway}>Check Gateway</button>
-              <button className="tool-btn" onClick={handleTunnel}>Check Tunnel</button>
+              <button className="tool-btn" onClick={handleIPConfig}>🧾 Check IPConfig</button>
+              <button className="tool-btn" onClick={handleGateway}>🌐 Check Gateway</button>
+              <button className="tool-btn" onClick={handleTunnel}>🔐 Check Tunnel</button>
               {role === 'server' ? (
-                <button className="tool-btn" onClick={handleSaveClientConfig}>Client Config Saqlash</button>
+                <button className="tool-btn" onClick={handleSaveClientConfig}>💾 Client Config Saqlash</button>
               ) : (
-                <button className="tool-btn" onClick={handleLoadClientConfig}>Client Config Yuklash</button>
+                <button className="tool-btn" onClick={handleLoadClientConfig}>📂 Client Config Yuklash</button>
               )}
             </div>
           </section>
@@ -331,9 +331,9 @@ function App() {
 
             <div className="tools-grid">
               <button className="tool-btn" onClick={handleStartMessaging}>
-                {role === 'server' ? 'Chat serverni ishga tushirish' : 'Chat serverga ulanish'}
+                {role === 'server' ? '🚀 Chat serverni ishga tushirish' : '🔌 Chat serverga ulanish'}
               </button>
-              <button className="tool-btn" onClick={handleDisconnectSocket}>Chat ulanishni uzish</button>
+              <button className="tool-btn" onClick={handleDisconnectSocket}>⛔ Chat ulanishni uzish</button>
             </div>
 
             <div className="input-grid" style={{ marginTop: '16px' }}>
@@ -354,14 +354,14 @@ function App() {
 
             <div className="tools-grid" style={{ marginTop: '12px' }}>
               <button className="tool-btn" onClick={handleSendMessage} disabled={!socketConnected}>
-                Xabar yuborish
+                📨 Xabar yuborish
               </button>
             </div>
 
             <div className="console-card" style={{ marginTop: '16px' }}>
               <div className="console-head">
                 <h3>Chat oynasi</h3>
-                <span>{socketConnected ? 'Ulangan' : 'Ulanmagan'}</span>
+                <span>{socketConnected ? '🟢 Ulangan' : '🔴 Ulanmagan'}</span>
               </div>
 
               <div className="chat-box">
@@ -391,14 +391,14 @@ function App() {
 
             <div className="tools-grid">
               <button className="tool-btn" onClick={handleSendFile} disabled={!socketConnected}>
-                Fayl tanlash va yuborish
+                📁 Fayl tanlash va yuborish
               </button>
             </div>
 
             <div className="file-list">
               {receivedFiles.map((item, index) => (
                 <div key={`${item.name}-${index}`} className="file-item">
-                  <strong>{item.name}</strong>
+                  <strong>📄 {item.name}</strong>
                   <small>{item.from} → {item.path}</small>
                 </div>
               ))}

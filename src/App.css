@@ -100,6 +100,7 @@ body {
   height: 10px;
   border-radius: 50%;
   background: var(--ok-green);
+  box-shadow: 0 0 14px rgba(123, 224, 142, 0.55);
 }
 
 .mode-toggle {
@@ -118,6 +119,16 @@ body {
   font-weight: 700;
   cursor: pointer;
   font-size: 11px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.mode-btn:active {
+  transform: scale(0.97);
 }
 
 .mode-btn.active {
@@ -189,6 +200,19 @@ body {
   color: #fff;
   cursor: pointer;
   font-size: 11px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.action-btn:hover,
+.tool-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.24);
+  filter: brightness(1.06);
+}
+
+.action-btn:active,
+.tool-btn:active {
+  transform: scale(0.96);
 }
 
 .action-btn.dark { background: var(--button-dark); }
@@ -232,6 +256,11 @@ body {
   font-size: 11px;
 }
 
+.field input:focus {
+  border-color: rgba(160, 169, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(122, 114, 255, 0.18);
+}
+
 .field-full {
   grid-column: 1 / -1;
 }
@@ -261,11 +290,15 @@ body {
   cursor: pointer;
   font-size: 11px;
   min-height: 40px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
 }
 
 .tool-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  filter: none;
 }
 
 .process-grid {
