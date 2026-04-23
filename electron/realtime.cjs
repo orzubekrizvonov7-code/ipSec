@@ -20,6 +20,32 @@ function resetSockets() {
   connectedPeer = null;
 }
 
+function ensureReceiveDir() {
+  const saveDir = path.join(app.getPath('downloads'), 'IPSecWizard_Received');
+  if (!fs.existsSync(saveDir)) {
+    fs.mkdirSync(saveDir, { recursive: true });
+  }
+  return saveDir;
+}
+
+function saveIncomingFile(meta, data, event) {
+  if (!meta) return;
+
+  const saveDir = ensureReceiveDir();
+  const safeName = path.basename(meta.name || 'received_file.bin');
+  const savePath = path.join(saveDir, safeName);
+
+  const fileBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  fs.writeFileSync(savePath, fileBuffer);
+
+  event.sender.send('file-received', {
+    from: meta.from,
+    name: safeName,
+    size: fileBuffer.length,
+    path: savePath
+  });
+}
+
 function registerRealtimeHandlers() {
   ipcMain.handle('start-socket-server', async (event, port = 9001) => {
     try {
@@ -34,6 +60,7 @@ function registerRealtimeHandlers() {
 
       socketServer.on('connection', (ws, req) => {
         connectedPeer = ws;
+        ws._incomingFileMeta = null;
 
         event.sender.send('socket-status', {
           type: 'connected',
@@ -47,9 +74,7 @@ function registerRealtimeHandlers() {
 
               if (parsed.type === 'chat') {
                 event.sender.send('chat-message', parsed);
-              }
-
-              if (parsed.type === 'file-meta') {
+              } else if (parsed.type === 'file-meta') {
                 ws._incomingFileMeta = parsed;
               }
             } catch (err) {
@@ -62,22 +87,16 @@ function registerRealtimeHandlers() {
             const meta = ws._incomingFileMeta;
             if (!meta) return;
 
-            const saveDir = path.join(app.getPath('downloads'), 'IPSecWizard_Received');
-            if (!fs.existsSync(saveDir)) {
-              fs.mkdirSync(saveDir, { recursive: true });
+            try {
+              saveIncomingFile(meta, data, event);
+            } catch (err) {
+              event.sender.send('socket-status', {
+                type: 'error',
+                message: `Fayl saqlash xatosi: ${err.message}`
+              });
+            } finally {
+              ws._incomingFileMeta = null;
             }
-
-            const savePath = path.join(saveDir, meta.name);
-            fs.writeFileSync(savePath, data);
-
-            event.sender.send('file-received', {
-              from: meta.from,
-              name: meta.name,
-              size: data.length,
-              path: savePath
-            });
-
-            ws._incomingFileMeta = null;
           }
         });
 
@@ -114,6 +133,7 @@ function registerRealtimeHandlers() {
       }
 
       socketClient = new WebSocket(`ws://${host}:${port}`);
+      socketClient._incomingFileMeta = null;
 
       socketClient.on('open', () => {
         connectedPeer = socketClient;
@@ -130,9 +150,7 @@ function registerRealtimeHandlers() {
 
             if (parsed.type === 'chat') {
               event.sender.send('chat-message', parsed);
-            }
-
-            if (parsed.type === 'file-meta') {
+            } else if (parsed.type === 'file-meta') {
               socketClient._incomingFileMeta = parsed;
             }
           } catch (err) {
@@ -145,22 +163,16 @@ function registerRealtimeHandlers() {
           const meta = socketClient._incomingFileMeta;
           if (!meta) return;
 
-          const saveDir = path.join(app.getPath('downloads'), 'IPSecWizard_Received');
-          if (!fs.existsSync(saveDir)) {
-            fs.mkdirSync(saveDir, { recursive: true });
+          try {
+            saveIncomingFile(meta, data, event);
+          } catch (err) {
+            event.sender.send('socket-status', {
+              type: 'error',
+              message: `Fayl saqlash xatosi: ${err.message}`
+            });
+          } finally {
+            socketClient._incomingFileMeta = null;
           }
-
-          const savePath = path.join(saveDir, meta.name);
-          fs.writeFileSync(savePath, data);
-
-          event.sender.send('file-received', {
-            from: meta.from,
-            name: meta.name,
-            size: data.length,
-            path: savePath
-          });
-
-          socketClient._incomingFileMeta = null;
         }
       });
 
@@ -230,7 +242,7 @@ function registerRealtimeHandlers() {
         size: fileBuffer.length
       }));
 
-      connectedPeer.send(fileBuffer);
+      connectedPeer.send(fileBuffer, { binary: true });
 
       event.sender.send('socket-status', {
         type: 'file-sent',

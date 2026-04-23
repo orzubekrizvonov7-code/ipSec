@@ -1,0 +1,10 @@
+{
+  "serverRealIP": "172.20.10.6",
+  "clientRealIP": "172.20.10.3",
+  "serverTunnelIP": "10.10.10.1",
+  "clientTunnelIP": "10.10.10.2",
+  "psk": "IPsuperSECRET",
+  "profileDomain": true,
+  "profilePrivate": true,
+  "profilePublic": true
+}
